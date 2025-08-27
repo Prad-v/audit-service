@@ -27,13 +27,13 @@ from app.api.middleware import (
     AuthenticationMiddleware,
     TenantIsolationMiddleware,
 )
-from app.api.v1 import audit, auth, health
+from app.api.v1 import audit, auth, health, metrics
 from app.config import get_settings
 from app.core.exceptions import AuditLogException
 from app.db.database import DatabaseManager
 from app.services.cache_service import CacheService
 from app.services.nats_service import NATSService
-from app.utils.logging import setup_logging
+from app.utils.logging import setup_logging, LoggingMiddleware
 from app.utils.metrics import setup_metrics
 
 # Setup structured logging
@@ -155,6 +155,9 @@ def create_app() -> FastAPI:
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         app.add_middleware(SlowAPIMiddleware)
     
+    # Logging middleware (should be early in the chain)
+    app.add_middleware(LoggingMiddleware)
+    
     # Authentication and authorization middleware
     app.add_middleware(TenantIsolationMiddleware)
     app.add_middleware(AuthenticationMiddleware)
@@ -200,15 +203,9 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Logs"])
     
-    # Metrics endpoint
+    # Metrics endpoints
     if settings.monitoring.prometheus_enabled:
-        @app.get("/metrics", include_in_schema=False)
-        async def metrics():
-            """Prometheus metrics endpoint."""
-            return Response(
-                generate_latest(),
-                media_type=CONTENT_TYPE_LATEST,
-            )
+        app.include_router(metrics.router, prefix="/api/v1", tags=["Metrics"])
     
     # Root endpoint
     @app.get("/", include_in_schema=False)

@@ -1,0 +1,97 @@
+{
+  "name": "audit-log-frontend",
+  "version": "1.0.0",
+  "description": "Backstage frontend for the audit log framework",
+  "private": true,
+  "engines": {
+    "node": "18 || 20"
+  },
+  "scripts": {
+    "dev": "backstage-cli package start",
+    "start": "backstage-cli package start",
+    "build": "backstage-cli package build --stats",
+    "build:backend": "backstage-cli package build --role backend",
+    "build:image": "backstage-cli package build-image",
+    "tsc": "tsc",
+    "tsc:full": "tsc --skipLibCheck false --incremental false",
+    "clean": "backstage-cli package clean",
+    "test": "backstage-cli package test",
+    "test:watch": "backstage-cli package test --watch",
+    "test:e2e": "cross-env PORT=3001 start-server-and-test start http://localhost:3001 cy:dev",
+    "test:e2e:ci": "cross-env PORT=3001 start-server-and-test start http://localhost:3001 cy:run",
+    "lint": "backstage-cli package lint",
+    "lint:fix": "backstage-cli package lint --fix",
+    "prettier:check": "prettier --check .",
+    "prettier:fix": "prettier --write .",
+    "cy:dev": "cypress open",
+    "cy:run": "cypress run --browser chrome"
+  },
+  "dependencies": {
+    "@backstage/app-defaults": "^1.4.7",
+    "@backstage/catalog-model": "^1.4.3",
+    "@backstage/cli": "^0.22.13",
+    "@backstage/core-app-api": "^1.11.3",
+    "@backstage/core-components": "^0.13.10",
+    "@backstage/core-plugin-api": "^1.8.2",
+    "@backstage/integration-react": "^1.1.25",
+    "@backstage/plugin-api-docs": "^0.10.4",
+    "@backstage/plugin-catalog": "^1.15.0",
+    "@backstage/plugin-catalog-common": "^1.0.17",
+    "@backstage/plugin-catalog-graph": "^0.2.42",
+    "@backstage/plugin-catalog-import": "^0.10.7",
+    "@backstage/plugin-catalog-react": "^1.9.3",
+    "@backstage/plugin-github-actions": "^0.6.3",
+    "@backstage/plugin-org": "^0.6.22",
+    "@backstage/plugin-permission-react": "^0.4.17",
+    "@backstage/plugin-scaffolder": "^1.17.0",
+    "@backstage/plugin-search": "^1.4.7",
+    "@backstage/plugin-search-react": "^1.7.7",
+    "@backstage/plugin-tech-radar": "^0.6.15",
+    "@backstage/plugin-techdocs": "^1.9.2",
+    "@backstage/plugin-techdocs-react": "^1.1.16",
+    "@backstage/plugin-techdocs-module-addons-contrib": "^1.1.3",
+    "@backstage/plugin-user-settings": "^0.8.0",
+    "@backstage/theme": "^0.4.4",
+    "@material-ui/core": "^4.12.2",
+    "@material-ui/icons": "^4.9.1",
+    "@material-ui/lab": "4.0.0-alpha.61",
+    "history": "^5.0.0",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-router": "^6.3.0",
+    "react-router-dom": "^6.3.0",
+    "react-use": "^17.2.4",
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
+    "typescript": "~4.6.4"
+  },
+  "devDependencies": {
+    "@backstage/test-utils": "^1.4.7",
+    "@testing-library/jest-dom": "^5.10.1",
+    "@testing-library/react": "^12.1.3",
+    "@testing-library/user-event": "^14.0.0",
+    "@types/jest": "^29.0.0",
+    "@types/node": "^16.11.26",
+    "cross-env": "^7.0.0",
+    "cypress": "^9.7.0",
+    "eslint": "^8.6.0",
+    "jest": "^29.0.0",
+    "prettier": "^2.3.2",
+    "start-server-and-test": "^1.10.11"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "files": [
+    "dist"
+  ]
+}

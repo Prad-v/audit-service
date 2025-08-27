@@ -1,0 +1,686 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service-backend
+  namespace: audit-service
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audit-service
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audit-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: audit-service
+      imagePullSecrets:
+      - name: audit-service-registry
+      containers:
+      - name: backend
+        image: gcr.io/PROJECT_ID/audit-service-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 8000
+          protocol: TCP
+        env:
+        # Configuration from ConfigMap
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: LOG_LEVEL
+        - name: API_V1_STR
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: API_V1_STR
+        - name: PROJECT_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PROJECT_NAME
+        - name: DATABASE_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: DATABASE_TYPE
+        - name: DATABASE_POOL_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: DATABASE_POOL_SIZE
+        - name: DATABASE_MAX_OVERFLOW
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: DATABASE_MAX_OVERFLOW
+        - name: DATABASE_POOL_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: DATABASE_POOL_TIMEOUT
+        - name: DATABASE_POOL_RECYCLE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: DATABASE_POOL_RECYCLE
+        - name: BIGQUERY_DATASET
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BIGQUERY_DATASET
+        - name: BIGQUERY_TABLE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BIGQUERY_TABLE
+        - name: BIGQUERY_LOCATION
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BIGQUERY_LOCATION
+        - name: USE_PUBSUB
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: USE_PUBSUB
+        - name: PUBSUB_TOPIC_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PUBSUB_TOPIC_NAME
+        - name: PUBSUB_SUBSCRIPTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PUBSUB_SUBSCRIPTION_NAME
+        - name: PUBSUB_MAX_MESSAGES
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PUBSUB_MAX_MESSAGES
+        - name: PUBSUB_ACK_DEADLINE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PUBSUB_ACK_DEADLINE
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: REDIS_PORT
+        - name: REDIS_DB
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: REDIS_DB
+        - name: REDIS_MAX_CONNECTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: REDIS_MAX_CONNECTIONS
+        - name: CACHE_TTL
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CACHE_TTL
+        - name: CACHE_MAX_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CACHE_MAX_SIZE
+        - name: CACHE_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CACHE_ENABLED
+        - name: JWT_ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: JWT_ALGORITHM
+        - name: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        - name: JWT_REFRESH_TOKEN_EXPIRE_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: JWT_REFRESH_TOKEN_EXPIRE_DAYS
+        - name: RATE_LIMIT_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: RATE_LIMIT_ENABLED
+        - name: RATE_LIMIT_REQUESTS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: RATE_LIMIT_REQUESTS
+        - name: RATE_LIMIT_WINDOW
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: RATE_LIMIT_WINDOW
+        - name: METRICS_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: METRICS_ENABLED
+        - name: METRICS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: METRICS_PORT
+        - name: WORKER_CONCURRENCY
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: WORKER_CONCURRENCY
+        - name: WORKER_MAX_RETRIES
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: WORKER_MAX_RETRIES
+        - name: BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BATCH_SIZE
+        - name: BATCH_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BATCH_TIMEOUT
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CORS_ORIGINS
+        - name: CORS_CREDENTIALS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CORS_CREDENTIALS
+        - name: CORS_METHODS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CORS_METHODS
+        - name: CORS_HEADERS
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: CORS_HEADERS
+        
+        # Secrets
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: JWT_SECRET_KEY
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: DATABASE_URL
+        - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        - name: GCP_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GCP_PROJECT_ID
+        - name: GCP_REGION
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GCP_REGION
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: REDIS_PASSWORD
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: ENCRYPTION_KEY
+        
+        # Pod metadata
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        
+        # Startup probe for slow-starting containers
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        
+        # Resource limits and requests
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+        - name: logs
+          mountPath: /app/logs
+        - name: gcp-credentials
+          mountPath: /etc/gcp
+          readOnly: true
+      
+      # Init container for database migrations
+      initContainers:
+      - name: migrate
+        image: gcr.io/PROJECT_ID/audit-service-backend:latest
+        command: ["alembic", "upgrade", "head"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: DATABASE_URL
+        - name: GCP_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GCP_PROJECT_ID
+        - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: gcp-credentials
+          mountPath: /etc/gcp
+          readOnly: true
+      
+      # Volumes
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      - name: gcp-credentials
+        secret:
+          secretName: audit-service-secrets
+          items:
+          - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+            path: credentials.json
+      
+      # Pod security context
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Node selection and affinity
+      nodeSelector:
+        kubernetes.io/os: linux
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - audit-service
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - backend
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations for node taints
+      tolerations:
+      - key: "audit-service"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      # Termination grace period
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service-worker
+  namespace: audit-service
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audit-service
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audit-service
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: audit-service
+      imagePullSecrets:
+      - name: audit-service-registry
+      containers:
+      - name: worker
+        image: gcr.io/PROJECT_ID/audit-service-backend:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "app.worker"]
+        ports:
+        - name: metrics
+          containerPort: 8000
+          protocol: TCP
+        env:
+        # Same environment variables as backend
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: LOG_LEVEL
+        - name: DATABASE_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: DATABASE_TYPE
+        - name: BIGQUERY_DATASET
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BIGQUERY_DATASET
+        - name: BIGQUERY_TABLE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BIGQUERY_TABLE
+        - name: USE_PUBSUB
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: USE_PUBSUB
+        - name: PUBSUB_TOPIC_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PUBSUB_TOPIC_NAME
+        - name: PUBSUB_SUBSCRIPTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: PUBSUB_SUBSCRIPTION_NAME
+        - name: WORKER_CONCURRENCY
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: WORKER_CONCURRENCY
+        - name: WORKER_MAX_RETRIES
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: WORKER_MAX_RETRIES
+        - name: BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BATCH_SIZE
+        - name: BATCH_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: audit-service-config
+              key: BATCH_TIMEOUT
+        
+        # Secrets
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: DATABASE_URL
+        - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        - name: GCP_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: audit-service-secrets
+              key: GCP_PROJECT_ID
+        
+        # Pod metadata
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Resource limits and requests
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+        - name: gcp-credentials
+          mountPath: /etc/gcp
+          readOnly: true
+      
+      # Volumes
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      - name: gcp-credentials
+        secret:
+          secretName: audit-service-secrets
+          items:
+          - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+            path: credentials.json
+      
+      # Pod security context
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Node selection and affinity
+      nodeSelector:
+        kubernetes.io/os: linux
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - audit-service
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - worker
+              topologyKey: kubernetes.io/hostname
+      
+      # Termination grace period
+      terminationGracePeriodSeconds: 30

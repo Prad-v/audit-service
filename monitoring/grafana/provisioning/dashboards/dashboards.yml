@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'audit-log-dashboards'
+    orgId: 1
+    folder: 'Audit Log System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

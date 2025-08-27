@@ -1,0 +1,173 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-service-config
+  namespace: audit-service
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: config
+data:
+  # Application Configuration
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  API_V1_STR: "/api/v1"
+  PROJECT_NAME: "Audit Service"
+  
+  # Database Configuration
+  DATABASE_TYPE: "bigquery"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "30"
+  DATABASE_POOL_TIMEOUT: "30"
+  DATABASE_POOL_RECYCLE: "3600"
+  
+  # BigQuery Configuration
+  BIGQUERY_DATASET: "audit_logs"
+  BIGQUERY_TABLE: "audit_events"
+  BIGQUERY_LOCATION: "US"
+  
+  # Pub/Sub Configuration
+  USE_PUBSUB: "true"
+  PUBSUB_TOPIC_NAME: "audit-events"
+  PUBSUB_SUBSCRIPTION_NAME: "audit-processor"
+  PUBSUB_MAX_MESSAGES: "100"
+  PUBSUB_ACK_DEADLINE: "60"
+  PUBSUB_RETENTION: "604800"
+  PUBSUB_ORDERING: "false"
+  PUBSUB_EXACTLY_ONCE: "false"
+  
+  # Redis Configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_MAX_CONNECTIONS: "20"
+  REDIS_RETRY_ON_TIMEOUT: "true"
+  REDIS_SOCKET_KEEPALIVE: "true"
+  REDIS_SOCKET_KEEPALIVE_OPTIONS: "1,3,5"
+  
+  # Cache Configuration
+  CACHE_TTL: "300"
+  CACHE_MAX_SIZE: "1000"
+  CACHE_ENABLED: "true"
+  
+  # Security Configuration
+  JWT_ALGORITHM: "HS256"
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  API_KEY_EXPIRE_DAYS: "365"
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS: "1000"
+  RATE_LIMIT_WINDOW: "3600"
+  
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "8000"
+  HEALTH_CHECK_INTERVAL: "30"
+  
+  # Worker Configuration
+  WORKER_CONCURRENCY: "4"
+  WORKER_MAX_RETRIES: "3"
+  WORKER_RETRY_DELAY: "5"
+  BATCH_SIZE: "100"
+  BATCH_TIMEOUT: "5"
+  
+  # CORS Configuration
+  CORS_ORIGINS: "https://backstage.example.com,https://audit.example.com"
+  CORS_CREDENTIALS: "true"
+  CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_HEADERS: "Content-Type,Authorization,X-Tenant-ID,X-Correlation-ID"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-service-nginx-config
+  namespace: audit-service
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: nginx-config
+data:
+  nginx.conf: |
+    upstream backend {
+        server audit-service-backend:8000;
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+        
+        # Health check endpoint
+        location /health {
+            proxy_pass http://backend/health;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Metrics endpoint (internal only)
+        location /metrics {
+            allow 10.0.0.0/8;
+            allow 172.16.0.0/12;
+            allow 192.168.0.0/16;
+            deny all;
+            
+            proxy_pass http://backend/metrics;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Authentication endpoints
+        location /api/v1/auth {
+            limit_req zone=auth burst=10 nodelay;
+            
+            proxy_pass http://backend/api/v1/auth;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Timeout settings
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 10s;
+            proxy_read_timeout 10s;
+        }
+        
+        # API endpoints
+        location /api {
+            limit_req zone=api burst=20 nodelay;
+            
+            proxy_pass http://backend/api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Timeout settings
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            
+            # Buffer settings
+            proxy_buffering on;
+            proxy_buffer_size 4k;
+            proxy_buffers 8 4k;
+        }
+        
+        # Default location
+        location / {
+            return 404;
+        }
+    }

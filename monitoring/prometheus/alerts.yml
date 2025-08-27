@@ -1,0 +1,233 @@
+groups:
+  - name: audit-log-system
+    rules:
+      # High-level system alerts
+      - alert: AuditSystemDown
+        expr: up{job="audit-log-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: audit-log-framework
+        annotations:
+          summary: "Audit log system is down"
+          description: "The audit log API service has been down for more than 1 minute."
+          runbook_url: "https://docs.company.com/runbooks/audit-system-down"
+
+      - alert: HighErrorRate
+        expr: rate(audit_logs_errors_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: audit-log-framework
+        annotations:
+          summary: "High error rate in audit log system"
+          description: "Error rate is {{ $value }} errors per second, which is above the threshold of 10."
+          runbook_url: "https://docs.company.com/runbooks/high-error-rate"
+
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(audit_api_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-log-framework
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s, which is above the 2s threshold."
+          runbook_url: "https://docs.company.com/runbooks/high-latency"
+
+      # Database alerts
+      - alert: DatabaseConnectionsHigh
+        expr: audit_db_connections_active > 80
+        for: 3m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: database
+        annotations:
+          summary: "High number of database connections"
+          description: "Database connections are at {{ $value }}, approaching the limit."
+          runbook_url: "https://docs.company.com/runbooks/db-connections-high"
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(audit_query_duration_seconds_bucket[5m])) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s, which is above the 5s threshold."
+          runbook_url: "https://docs.company.com/runbooks/slow-queries"
+
+      - alert: DatabaseDown
+        expr: audit_db_connections_active == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: audit-log-framework
+          component: database
+        annotations:
+          summary: "Database connection lost"
+          description: "No active database connections detected."
+          runbook_url: "https://docs.company.com/runbooks/database-down"
+
+      # Cache alerts
+      - alert: LowCacheHitRate
+        expr: rate(audit_cache_hits_total[5m]) / (rate(audit_cache_hits_total[5m]) + rate(audit_cache_misses_total[5m])) * 100 < 70
+        for: 10m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value }}%, which is below the 70% threshold."
+          runbook_url: "https://docs.company.com/runbooks/low-cache-hit-rate"
+
+      - alert: CacheDown
+        expr: absent(audit_cache_hits_total) and absent(audit_cache_misses_total)
+        for: 2m
+        labels:
+          severity: critical
+          service: audit-log-framework
+          component: cache
+        annotations:
+          summary: "Cache service is down"
+          description: "No cache metrics detected, cache service may be down."
+          runbook_url: "https://docs.company.com/runbooks/cache-down"
+
+      # NATS/Messaging alerts
+      - alert: NATSPublishErrors
+        expr: rate(audit_nats_publish_errors_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: messaging
+        annotations:
+          summary: "NATS publish errors detected"
+          description: "NATS publish error rate is {{ $value }} errors per second."
+          runbook_url: "https://docs.company.com/runbooks/nats-errors"
+
+      - alert: LowNATSMessageRate
+        expr: rate(audit_nats_messages_published_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: info
+          service: audit-log-framework
+          component: messaging
+        annotations:
+          summary: "Low NATS message rate"
+          description: "NATS message rate is {{ $value }} messages per second, which may indicate low activity."
+
+      # Performance alerts
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / 1024 / 1024) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: performance
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}MB, which is above the 1GB threshold."
+          runbook_url: "https://docs.company.com/runbooks/high-memory"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: performance
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%, which is above the 80% threshold."
+          runbook_url: "https://docs.company.com/runbooks/high-cpu"
+
+      # Business logic alerts
+      - alert: AuditLogVolumeSpike
+        expr: rate(audit_logs_created_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: info
+          service: audit-log-framework
+          component: business
+        annotations:
+          summary: "High audit log creation rate"
+          description: "Audit log creation rate is {{ $value }} logs per second, which is unusually high."
+
+      - alert: NoAuditLogsCreated
+        expr: rate(audit_logs_created_total[10m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: business
+        annotations:
+          summary: "No audit logs being created"
+          description: "No audit logs have been created in the last 15 minutes."
+          runbook_url: "https://docs.company.com/runbooks/no-audit-logs"
+
+      - alert: TenantIsolationBreach
+        expr: increase(audit_logs_errors_total{error_type="tenant_isolation"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: audit-log-framework
+          component: security
+        annotations:
+          summary: "Potential tenant isolation breach"
+          description: "Tenant isolation errors detected, immediate investigation required."
+          runbook_url: "https://docs.company.com/runbooks/tenant-isolation-breach"
+
+      # Export and batch processing alerts
+      - alert: SlowExportOperations
+        expr: histogram_quantile(0.95, rate(audit_export_duration_seconds_bucket[5m])) > 300
+        for: 5m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: export
+        annotations:
+          summary: "Slow export operations"
+          description: "95th percentile export time is {{ $value }}s, which is above the 5-minute threshold."
+          runbook_url: "https://docs.company.com/runbooks/slow-exports"
+
+      - alert: LargeBatchSizes
+        expr: histogram_quantile(0.95, rate(audit_batch_size_bucket[5m])) > 5000
+        for: 10m
+        labels:
+          severity: info
+          service: audit-log-framework
+          component: batch
+        annotations:
+          summary: "Large batch sizes detected"
+          description: "95th percentile batch size is {{ $value }}, which may indicate batching issues."
+
+  - name: audit-log-health-checks
+    rules:
+      - alert: HealthCheckFailing
+        expr: up{job="audit-log-health"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: audit-log-framework
+          component: health
+        annotations:
+          summary: "Health check endpoint failing"
+          description: "Health check endpoint has been failing for 30 seconds."
+          runbook_url: "https://docs.company.com/runbooks/health-check-failing"
+
+      - alert: DependencyHealthDegraded
+        expr: audit_system_health{status!="healthy"} == 1
+        for: 1m
+        labels:
+          severity: warning
+          service: audit-log-framework
+          component: dependencies
+        annotations:
+          summary: "System dependency health degraded"
+          description: "One or more system dependencies are reporting degraded health."
+          runbook_url: "https://docs.company.com/runbooks/dependency-health"
