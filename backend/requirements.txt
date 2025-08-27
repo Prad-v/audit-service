@@ -1,0 +1,88 @@
+# FastAPI and ASGI server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+gunicorn==21.2.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# Redis
+redis[hiredis]==5.0.1
+aioredis==2.0.1
+
+# NATS
+nats-py==2.6.0
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+cryptography==41.0.7
+
+# HTTP client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Data validation and serialization
+pydantic[email]==2.5.0
+pydantic-settings==2.1.0
+
+# Utilities
+python-dotenv==1.0.0
+structlog==23.2.0
+rich==13.7.0
+typer==0.9.0
+click==8.1.7
+
+# Monitoring and metrics
+prometheus-client==0.19.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+
+# Date and time
+python-dateutil==2.8.2
+pytz==2023.3
+
+# JSON handling
+orjson==3.9.10
+
+# Background tasks
+celery[redis]==5.3.4
+
+# File handling
+openpyxl==3.1.2
+pandas==2.1.4
+
+# Google Cloud (for production)
+google-cloud-bigquery==3.13.0
+google-cloud-pubsub==2.18.4
+google-cloud-storage==2.10.0
+google-auth==2.25.2
+
+# Rate limiting
+slowapi==0.1.9
+
+# CORS
+fastapi-cors==0.0.6
+
+# Health checks
+fastapi-health==0.4.0
+
+# Caching
+aiocache==0.12.2
+
+# Configuration
+dynaconf==3.2.4
+
+# Async utilities
+asyncio-mqtt==0.16.1
+aiofiles==23.2.1
+
+# Data processing
+numpy==1.25.2
