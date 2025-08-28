@@ -45,9 +45,9 @@ class NATSService:
         """Publish message to NATS subject."""
         logger.debug("NATS publish operation (stub)", subject=subject)
     
-    async def subscribe(self, subject: str, callback) -> None:
+    async def subscribe(self, subject: str, callback, queue: Optional[str] = None) -> None:
         """Subscribe to NATS subject."""
-        logger.debug("NATS subscribe operation (stub)", subject=subject)
+        logger.debug("NATS subscribe operation (stub)", subject=subject, queue=queue)
     
     def get_server_info(self) -> Dict[str, Any]:
         """Get NATS server info."""

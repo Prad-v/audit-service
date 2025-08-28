@@ -349,4 +349,4 @@ def require_system_admin():
 
 def require_tenant_admin():
     """Decorator to require tenant admin role."""
-    return require_role(UserRole.TENANT_ADMIN)
+    return require_role(UserRole.SYSTEM_ADMIN)

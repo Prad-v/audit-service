@@ -58,7 +58,7 @@ class AuditLog(Base, TimestampMixin):
     # Request/Response data (JSON fields for BigQuery compatibility)
     request_data = Column(JSON, nullable=True)
     response_data = Column(JSON, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    event_metadata = Column(JSON, nullable=True)
     
     # Multi-tenancy and service identification
     tenant_id = Column(String(255), nullable=False, index=True)
@@ -83,9 +83,8 @@ class AuditLog(Base, TimestampMixin):
         Index('idx_audit_logs_partition_tenant', 'partition_date', 'tenant_id'),
         Index('idx_audit_logs_correlation', 'correlation_id'),
         Index('idx_audit_logs_resource', 'resource_type', 'resource_id'),
-        # GIN indexes for JSON fields (PostgreSQL specific)
-        Index('idx_audit_logs_metadata_gin', 'metadata', postgresql_using='gin'),
-        Index('idx_audit_logs_request_data_gin', 'request_data', postgresql_using='gin'),
+        # Note: GIN indexes on JSON fields removed due to operator class issues
+        # Can be added later with proper JSONB columns if needed
     )
 
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Response, Depends
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import structlog
 
-from app.core.auth import get_current_user
+from app.api.middleware import get_current_user
 from app.utils.metrics import collect_periodic_metrics
 
 logger = structlog.get_logger(__name__)

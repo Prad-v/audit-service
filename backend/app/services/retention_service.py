@@ -335,7 +335,7 @@ class RetentionService:
                 'timestamp': record.timestamp.isoformat(),
                 'ip_address': record.ip_address,
                 'user_agent': record.user_agent,
-                'metadata': record.metadata,
+                'metadata': record.event_metadata,
                 'created_at': record.created_at.isoformat()
             }
             archive_data.append(record_dict)

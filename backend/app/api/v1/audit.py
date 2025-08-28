@@ -45,7 +45,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/events", response_model=AuditLogResponse)
-@require_permission(Permission.AUDIT_WRITE)
+@require_permission(Permission.WRITE_AUDIT)
 @limiter.limit("1000/minute")  # High rate limit for audit writes
 async def create_audit_event(
     request: Request,
@@ -107,7 +107,7 @@ async def create_audit_event(
 
 
 @router.post("/events/batch", response_model=List[AuditLogResponse])
-@require_permission(Permission.AUDIT_WRITE)
+@require_permission(Permission.WRITE_AUDIT)
 @limiter.limit("100/minute")  # Lower rate limit for batch operations
 async def create_audit_events_batch(
     request: Request,
@@ -178,7 +178,7 @@ async def create_audit_events_batch(
 
 
 @router.get("/events", response_model=PaginatedAuditLogs)
-@require_permission(Permission.AUDIT_READ)
+@require_permission(Permission.READ_AUDIT)
 @limiter.limit("300/minute")  # Rate limit for queries
 async def get_audit_events(
     request: Request,
@@ -270,7 +270,7 @@ async def get_audit_events(
 
 
 @router.get("/events/{audit_id}", response_model=AuditLogResponse)
-@require_permission(Permission.AUDIT_READ)
+@require_permission(Permission.READ_AUDIT)
 @limiter.limit("500/minute")
 async def get_audit_event(
     request: Request,
@@ -321,7 +321,7 @@ async def get_audit_event(
 
 
 @router.get("/events/export", response_model=AuditLogExport)
-@require_permission(Permission.EXPORT_DATA)
+@require_permission(Permission.EXPORT_AUDIT)
 @limiter.limit("10/minute")  # Low rate limit for exports
 async def export_audit_events(
     request: Request,
@@ -410,7 +410,7 @@ async def export_audit_events(
 
 
 @router.get("/summary", response_model=AuditLogSummary)
-@require_permission(Permission.AUDIT_READ)
+@require_permission(Permission.READ_AUDIT)
 @limiter.limit("100/minute")
 async def get_audit_summary(
     request: Request,

@@ -18,11 +18,11 @@ from nats.aio.client import Client as NATS
 from nats.aio.errors import ErrConnectionClosed, ErrTimeout, ErrNoServers
 
 from app.config import get_settings
-from app.db.database import get_database_manager
+from app.db.database import DatabaseManager, set_database_manager
 from app.db.schemas import AuditLog
 from app.models.audit import EventType, Severity
-from app.services.cache_service import get_cache_service
-from app.services.nats_service import get_nats_service
+from app.services.cache_service import CacheService
+from app.services.nats_service import NATSService
 from app.utils.metrics import audit_metrics, track_execution_time
 from app.utils.logging import setup_logging
 
@@ -34,9 +34,9 @@ class AuditWorker:
     """Background worker for processing audit log events."""
     
     def __init__(self):
-        self.nats_service = get_nats_service()
-        self.db_manager = get_database_manager()
-        self.cache_service = get_cache_service()
+        self.nats_service = None
+        self.db_manager = None
+        self.cache_service = None
         self.running = False
         self.batch_buffer: List[Dict[str, Any]] = []
         self.batch_size = settings.worker.batch_size
@@ -49,9 +49,16 @@ class AuditWorker:
         
         try:
             # Initialize services
+            self.db_manager = DatabaseManager(settings.database)
+            self.cache_service = CacheService(settings.redis)
+            self.nats_service = NATSService(settings.nats)
+            
             await self.db_manager.initialize()
             await self.cache_service.initialize()
             await self.nats_service.initialize()
+            
+            # Set global database manager for other components that might need it
+            set_database_manager(self.db_manager)
             
             # Set up signal handlers
             self._setup_signal_handlers()
@@ -75,9 +82,12 @@ class AuditWorker:
             await self._process_batch()
         
         # Close services
-        await self.nats_service.close()
-        await self.cache_service.close()
-        await self.db_manager.close()
+        if self.nats_service:
+            await self.nats_service.close()
+        if self.cache_service:
+            await self.cache_service.close()
+        if self.db_manager:
+            await self.db_manager.close()
         
         logger.info("Audit log worker stopped")
     

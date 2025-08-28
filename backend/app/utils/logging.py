@@ -283,7 +283,7 @@ def setup_logging(config: Dict[str, Any]):
             structlog.processors.JSONRenderer()
         ],
         wrapper_class=structlog.make_filtering_bound_logger(
-            logging.getLevelName(config.get('level', 'INFO').upper())
+            logging.getLevelName(getattr(config, 'level', 'INFO').upper())
         ),
         logger_factory=structlog.WriteLoggerFactory(),
         cache_logger_on_first_use=True,
@@ -293,7 +293,7 @@ def setup_logging(config: Dict[str, Any]):
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=logging.getLevelName(config.get('level', 'INFO').upper()),
+        level=logging.getLevelName(getattr(config, 'level', 'INFO').upper()),
     )
     
     # Set log levels for third-party libraries

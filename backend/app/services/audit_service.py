@@ -71,7 +71,7 @@ class AuditService:
                 action=audit_data.action,
                 severity=audit_data.severity,
                 description=audit_data.description,
-                metadata=audit_data.metadata or {},
+                event_metadata=audit_data.metadata or {},
                 ip_address=audit_data.ip_address,
                 user_agent=audit_data.user_agent,
                 session_id=audit_data.session_id,
@@ -136,7 +136,7 @@ class AuditService:
                     action=audit_data.action,
                     severity=audit_data.severity,
                     description=audit_data.description,
-                    metadata=audit_data.metadata or {},
+                    event_metadata=audit_data.metadata or {},
                     ip_address=audit_data.ip_address,
                     user_agent=audit_data.user_agent,
                     session_id=audit_data.session_id,
@@ -374,7 +374,7 @@ class AuditService:
                         "action": log.action,
                         "severity": log.severity.value,
                         "description": log.description,
-                        "metadata": log.metadata,
+                        "metadata": log.event_metadata,
                         "ip_address": log.ip_address,
                         "user_agent": log.user_agent,
                         "session_id": log.session_id,
@@ -490,7 +490,7 @@ class AuditService:
                 "action": audit_log.action,
                 "severity": audit_log.severity.value,
                 "timestamp": audit_log.timestamp.isoformat(),
-                "metadata": audit_log.metadata,
+                "metadata": audit_log.event_metadata,
             }
             
             await self.nats_service.publish(

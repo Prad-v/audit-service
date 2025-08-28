@@ -54,7 +54,7 @@ class TestAuditService:
         assert event.user_agent == test_audit_event_data["user_agent"]
         assert event.session_id == test_audit_event_data["session_id"]
         assert event.correlation_id == test_audit_event_data["correlation_id"]
-        assert event.metadata == test_audit_event_data["metadata"]
+        assert event.event_metadata == test_audit_event_data["metadata"]
         assert event.created_at is not None
         assert event.timestamp is not None
 
@@ -89,7 +89,7 @@ class TestAuditService:
         assert event.user_agent is None
         assert event.session_id is None
         assert event.correlation_id is None
-        assert event.metadata is None
+        assert event.event_metadata is None
 
     async def test_create_event_with_custom_timestamp(self):
         """Test audit event creation with custom timestamp."""

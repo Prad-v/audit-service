@@ -182,7 +182,7 @@ async def create_user(request: Request, user_data: UserCreate):
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-@require_permission(Permission.USER_READ)
+@require_permission(Permission.MANAGE_USERS)
 async def get_user(request: Request, user_id: str):
     """
     Get a user by ID within the current tenant.
@@ -217,7 +217,7 @@ async def get_user(request: Request, user_id: str):
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-@require_permission(Permission.USER_WRITE)
+@require_permission(Permission.MANAGE_USERS)
 async def update_user(request: Request, user_id: str, user_data: UserUpdate):
     """
     Update a user's information.
@@ -315,7 +315,7 @@ async def deactivate_user(request: Request, user_id: str):
 
 
 @router.post("/api-keys", response_model=APIKeyResponse)
-@require_permission(Permission.API_KEY_CREATE)
+@require_permission(Permission.MANAGE_USERS)
 async def create_api_key(request: Request, api_key_data: APIKeyCreate):
     """
     Create a new API key for the current user.

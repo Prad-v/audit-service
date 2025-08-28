@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "license": "Apache-2.0",
+  "private": true,
   "publishConfig": {
     "access": "public",
     "main": "dist/index.esm.js",
@@ -24,14 +25,13 @@
   "dependencies": {
     "@backstage/core-components": "^0.13.10",
     "@backstage/core-plugin-api": "^1.8.2",
+    "@backstage/plugin-catalog-react": "^1.9.3",
     "@backstage/theme": "^0.4.4",
     "@material-ui/core": "^4.12.2",
     "@material-ui/icons": "^4.9.1",
     "@material-ui/lab": "4.0.0-alpha.61",
     "react": "^17.0.2",
-    "react-use": "^17.2.4",
-    "date-fns": "^2.29.3",
-    "lodash": "^4.17.21"
+    "react-use": "^17.2.4"
   },
   "devDependencies": {
     "@backstage/cli": "^0.22.13",
@@ -41,7 +41,8 @@
     "@testing-library/jest-dom": "^5.10.1",
     "@testing-library/react": "^12.1.3",
     "@testing-library/user-event": "^14.0.0",
-    "@types/lodash": "^4.14.191"
+    "@types/node": "^16.11.26",
+    "msw": "^1.0.0"
   },
   "files": [
     "dist"

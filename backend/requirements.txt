@@ -9,8 +9,8 @@ asyncpg==0.29.0
 alembic==1.12.1
 
 # Redis
-redis[hiredis]==5.0.1
-aioredis==2.0.1
+redis[hiredis]
+aioredis
 
 # NATS
 nats-py==2.6.0
@@ -53,7 +53,7 @@ pytz==2023.3
 orjson==3.9.10
 
 # Background tasks
-celery[redis]==5.3.4
+celery[redis]
 
 # File handling
 openpyxl==3.1.2

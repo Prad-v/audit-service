@@ -388,7 +388,7 @@ class BackupService:
                             'timestamp': record.timestamp.isoformat(),
                             'ip_address': record.ip_address,
                             'user_agent': record.user_agent,
-                            'metadata': record.metadata,
+                            'metadata': record.event_metadata,
                             'created_at': record.created_at.isoformat()
                         }
                         file_handle.write(json.dumps(record_dict) + '\n')

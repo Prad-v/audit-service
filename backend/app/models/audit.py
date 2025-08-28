@@ -216,7 +216,7 @@ class AuditEventQuery(BaseAuditModel):
             raise ValueError("Sort order must be 'asc' or 'desc'")
         return v.lower()
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_time_range(cls, values):
         """Validate time range parameters."""
         start_time = values.get('start_time')
@@ -271,7 +271,7 @@ class AuditStatistics(BaseAuditModel):
     """Model for audit statistics."""
     
     tenant_id: str = Field(..., description="Tenant ID")
-    date: date = Field(..., description="Statistics date")
+    stats_date: date = Field(..., description="Statistics date")
     total_events: int = Field(..., description="Total events for the day")
     unique_users: int = Field(..., description="Number of unique users")
     success_count: int = Field(..., description="Number of successful events")
@@ -297,7 +297,7 @@ class AuditStatisticsQuery(BaseAuditModel):
             raise ValueError("group_by must be 'day', 'week', or 'month'")
         return v
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_date_range(cls, values):
         """Validate date range."""
         start_date = values.get('start_date')
@@ -315,3 +315,15 @@ class AuditStatisticsResponse(BaseAuditModel):
     statistics: List[AuditStatistics] = Field(..., description="List of audit statistics")
     summary: Dict[str, Any] = Field(..., description="Summary statistics")
     period: str = Field(..., description="Statistics period")
+
+
+# Aliases for backward compatibility
+AuditLogCreate = AuditEventCreate
+AuditLogBatchCreate = AuditEventBatchCreate
+AuditLogResponse = AuditEventResponse
+AuditLogQuery = AuditEventQuery
+AuditLogSummary = AuditStatistics
+PaginatedAuditLogs = AuditEventQueryResponse
+AuditLogExport = AuditEventExport
+EventType = AuditEventType
+Severity = AuditEventStatus
