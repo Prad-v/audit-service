@@ -45,6 +45,7 @@ class QueryIntent:
     limit: Optional[int]
     aggregation: Optional[str]
     keywords: List[str]
+    original_query: str
 
 
 class MCPAuditService:
@@ -415,27 +416,57 @@ class MCPAuditService:
             time_range=time_range,
             limit=limit,
             aggregation=aggregation,
-            keywords=keywords
+            keywords=keywords,
+            original_query=query
         )
     
-    async def _execute_query(self, intent: QueryIntent) -> Dict[str, Any]:
+    async def _execute_query(self, intent: QueryIntent, provider_id: Optional[str] = None) -> Dict[str, Any]:
         """Execute query based on parsed intent"""
         db_manager = get_database_manager()
         session = db_manager.get_session()
         
         try:
             if intent.query_type == QueryType.SEARCH:
-                return await self._search_audit_events(session, intent)
+                result = await self._search_audit_events(session, intent)
             elif intent.query_type == QueryType.ANALYTICS:
-                return await self._get_audit_analytics(session, intent)
+                result = await self._get_audit_analytics(session, intent)
             elif intent.query_type == QueryType.TREND:
-                return await self._get_audit_trends(session, intent)
+                result = await self._get_audit_trends(session, intent)
             elif intent.query_type == QueryType.SUMMARY:
-                return await self._get_audit_summary(session, intent)
+                result = await self._get_audit_summary(session, intent)
             elif intent.query_type == QueryType.ALERT:
-                return await self._get_audit_alerts(session, intent)
+                result = await self._get_audit_alerts(session, intent)
             else:
-                return await self._search_audit_events(session, intent)
+                result = await self._search_audit_events(session, intent)
+            
+            # Add LLM summarization if provider is specified
+            if provider_id:
+                from app.services.llm_service import get_llm_service
+                from app.models.llm import LLMSummaryRequest
+                
+                llm_service = get_llm_service()
+                summary_request = LLMSummaryRequest(
+                    query=intent.original_query,
+                    mcp_result=result,
+                    provider_id=provider_id
+                )
+                
+                try:
+                    summary_response = await llm_service.summarize_mcp_result(summary_request)
+                    result["llm_summary"] = {
+                        "summary": summary_response.summary,
+                        "provider_used": summary_response.provider_used,
+                        "has_llm_analysis": summary_response.has_llm_analysis
+                    }
+                except Exception as e:
+                    logger.error(f"Error generating LLM summary: {e}")
+                    result["llm_summary"] = {
+                        "summary": "Error generating summary. Showing raw results.",
+                        "provider_used": provider_id,
+                        "has_llm_analysis": False
+                    }
+            
+            return result
         finally:
             await session.close()
     

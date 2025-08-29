@@ -5,6 +5,7 @@ import { AuditLogs } from './pages/AuditLogs'
 import { CreateEvent } from './pages/CreateEvent'
 import { EventDetails } from './pages/EventDetails'
 import MCPQuery from './pages/MCPQuery'
+import LLMProviders from './pages/LLMProviders'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/create-event" element={<CreateEvent />} />
         <Route path="/events/:id" element={<EventDetails />} />
         <Route path="/mcp-query" element={<MCPQuery />} />
+        <Route path="/llm-providers" element={<LLMProviders />} />
       </Routes>
     </Layout>
   )

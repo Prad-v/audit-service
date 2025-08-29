@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MessageSquare, Send, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { MessageSquare, Send, Loader2, AlertCircle, CheckCircle, CogIcon, X } from 'lucide-react';
 
 interface MCPMessage {
   id: string;
@@ -8,6 +8,14 @@ interface MCPMessage {
   timestamp: Date;
   data?: any;
   error?: string;
+}
+
+interface LLMProvider {
+  provider_id: string;
+  name: string;
+  provider_type: string;
+  status: string;
+  model_name: string;
 }
 
 interface MCPClientProps {
@@ -21,6 +29,9 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [capabilities, setCapabilities] = useState<any>(null);
+  const [providers, setProviders] = useState<LLMProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [showProviderSettings, setShowProviderSettings] = useState(false);
 
   const API_BASE = 'http://localhost:8000/api/v1/mcp';
 
@@ -38,6 +49,9 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
           const capabilitiesData = await capabilitiesResponse.json();
           setCapabilities(capabilitiesData);
         }
+
+        // Load LLM providers
+        await fetchProviders();
 
         const systemMessage: MCPMessage = {
           id: Date.now().toString(),
@@ -62,6 +76,19 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
     }
   }, []);
 
+  // Fetch LLM providers
+  const fetchProviders = useCallback(async () => {
+    try {
+      const response = await fetch('/api/v1/llm/providers');
+      if (response.ok) {
+        const data = await response.json();
+        setProviders(data.providers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching providers:', error);
+    }
+  }, []);
+
   // Send message to MCP server
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || !isConnected) return;
@@ -78,7 +105,7 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/query`, {
+      const response = await fetch(`${API_BASE}/query${selectedProvider ? `?provider_id=${selectedProvider}` : ''}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,6 +156,11 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
 
     const data = result.data;
     const queryType = result.query_type;
+
+    // Check if LLM summary is available
+    if (data.llm_summary && data.llm_summary.has_llm_analysis) {
+      return data.llm_summary.summary;
+    }
 
     switch (queryType) {
       case 'search_results':
@@ -188,6 +220,34 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* LLM Provider Settings */}
+      <div className="flex items-center justify-between p-3 border-b border-gray-100 bg-gray-50">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-600">LLM Provider:</span>
+          <select
+            value={selectedProvider}
+            onChange={(e) => setSelectedProvider(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+          >
+            <option value="">No LLM (Raw Results)</option>
+            {providers
+              .filter(p => p.status === 'active')
+              .map((provider) => (
+                <option key={provider.provider_id} value={provider.provider_id}>
+                  {provider.name} ({provider.model_name})
+                </option>
+              ))}
+          </select>
+        </div>
+        <button
+          onClick={() => setShowProviderSettings(true)}
+          className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800"
+        >
+          <CogIcon className="h-4 w-4" />
+          <span>Settings</span>
+        </button>
       </div>
 
       {/* Messages */}
@@ -272,6 +332,69 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
                 {example}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Provider Settings Modal */}
+      {showProviderSettings && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">LLM Provider Settings</h3>
+                <button
+                  onClick={() => setShowProviderSettings(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Configure LLM providers to enable AI-powered summarization of your audit queries.
+              </p>
+              <div className="space-y-3">
+                {providers.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500">
+                    No providers configured. Add your first provider to enable AI summarization.
+                  </div>
+                ) : (
+                  providers.map((provider) => (
+                    <div key={provider.provider_id} className="border rounded p-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{provider.name}</h4>
+                          <p className="text-sm text-gray-500">
+                            {provider.provider_type} • {provider.model_name}
+                          </p>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            provider.status === 'active' ? 'bg-green-100 text-green-800' :
+                            provider.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {provider.status}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedProvider(provider.provider_id)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Use
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => window.open('/llm-providers', '_blank')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Manage Providers
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

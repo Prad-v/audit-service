@@ -27,7 +27,7 @@ from app.api.middleware import (
     AuthenticationMiddleware,
     TenantIsolationMiddleware,
 )
-from app.api.v1 import audit, auth, health, metrics, mcp
+from app.api.v1 import audit, auth, health, metrics, mcp, llm
 from app.config import get_settings
 from app.core.exceptions import AuditLogException
 from app.db.database import DatabaseManager
@@ -216,6 +216,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Logs"])
     app.include_router(mcp.router, prefix="/api/v1", tags=["MCP - Natural Language Queries"])
+    app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM Providers"])
     
     # Metrics endpoints
     if settings.monitoring.prometheus_enabled:

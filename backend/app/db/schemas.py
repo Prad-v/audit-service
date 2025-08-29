@@ -102,9 +102,36 @@ class Tenant(Base, TimestampMixin):
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     api_keys = relationship("APIKey", back_populates="tenant", cascade="all, delete-orphan")
     retention_policies = relationship("RetentionPolicy", back_populates="tenant", cascade="all, delete-orphan")
+
+
+class LLMProvider(Base, TimestampMixin):
+    """LLM Provider table for MCP integration."""
+    __tablename__ = "llm_providers"
     
+    provider_id = Column(String(255), primary_key=True)
+    name = Column(String(255), nullable=False)
+    provider_type = Column(String(50), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default='inactive', index=True)
+    
+    # Connection settings
+    api_key = Column(Text, nullable=True)
+    base_url = Column(String(500), nullable=True)
+    model_name = Column(String(100), nullable=False)
+    
+    # LiteLLM specific settings
+    litellm_config = Column(JSON, nullable=True)
+    
+    # Metadata
+    created_by = Column(String(255), nullable=True, index=True)
+    
+    # Constraints
     __table_args__ = (
-        Index('idx_tenants_active', 'is_active'),
+        CheckConstraint("status IN ('active', 'inactive', 'error')", 
+                       name='ck_llm_providers_status'),
+        CheckConstraint("provider_type IN ('openai', 'anthropic', 'google', 'azure', 'litellm', 'custom')", 
+                       name='ck_llm_providers_type'),
+        Index('idx_llm_providers_type_status', 'provider_type', 'status'),
+        Index('idx_llm_providers_created_by', 'created_by'),
     )
 
 

@@ -61,6 +61,7 @@ async def mcp_health_check():
 @router.post("/query", response_model=MCPQueryResponse)
 async def query_audit_events(
     request: NaturalLanguageQuery,
+    provider_id: Optional[str] = Query(None, description="LLM provider ID for summarization"),
     current_user: Optional[str] = Depends(get_current_user)
 ):
     """
@@ -76,7 +77,8 @@ async def query_audit_events(
     try:
         # Process the query through MCP service
         result = await mcp_service._execute_query(
-            mcp_service._parse_query_intent(request.query)
+            mcp_service._parse_query_intent(request.query),
+            provider_id
         )
         
         return MCPQueryResponse(
@@ -99,6 +101,7 @@ async def query_audit_events(
 async def query_audit_events_get(
     q: str = Query(..., description="Natural language query"),
     limit: int = Query(50, description="Maximum number of results"),
+    provider_id: Optional[str] = Query(None, description="LLM provider ID for summarization"),
     current_user: Optional[str] = Depends(get_current_user)
 ):
     """
@@ -111,7 +114,8 @@ async def query_audit_events_get(
     try:
         # Process the query through MCP service
         result = await mcp_service._execute_query(
-            mcp_service._parse_query_intent(q)
+            mcp_service._parse_query_intent(q),
+            provider_id
         )
         
         return MCPQueryResponse(
