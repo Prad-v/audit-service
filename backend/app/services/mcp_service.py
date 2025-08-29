@@ -358,19 +358,24 @@ class MCPAuditService:
                 filters["severity"] = severity
                 keywords.append(keyword)
         
-        # Extract user IDs (look for "by user <name>" or "user <name>" patterns)
+        # Extract user IDs (look for various user reference patterns)
         user_patterns = [
             r'by user (\w+)',
             r'for user (\w+)',
-            r'from user (\w+)'
+            r'from user (\w+)',
+            r'user_id (\w+)',
+            r'user (\w+)',
+            r'for the user_id (\w+)',
+            r'get me the event for the user_id (\w+)'
         ]
         
-        # Only extract user ID if it's clearly a user reference, not part of event_type
-        if 'by user' in query_lower or 'for user' in query_lower or 'from user' in query_lower:
-            for pattern in user_patterns:
-                match = re.search(pattern, query_lower)
-                if match:
-                    user_id = match.group(1)
+        # Extract user ID from various patterns
+        for pattern in user_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                user_id = match.group(1)
+                # Skip if this looks like an event type (e.g., "user_login")
+                if not any(event_type in user_id for event_type in ["login", "logout", "create", "update", "delete"]):
                     filters["user_id"] = user_id
                     keywords.append(f"user:{user_id}")
                     break

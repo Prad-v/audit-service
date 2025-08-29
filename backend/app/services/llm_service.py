@@ -47,14 +47,15 @@ class LLMService:
             provider_id=provider_id,
             name=provider_data.name,
             provider_type=provider_data.provider_type.value,
-            status=LLMProviderStatus.INACTIVE.value,
+            status=provider_data.status.value,
             api_key=provider_data.api_key,
             base_url=provider_data.base_url,
             model_name=provider_data.model_name,
             litellm_config=provider_data.litellm_config,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
-            created_by=user_id
+            created_by=user_id,
+            is_enabled=provider_data.is_enabled
         )
         
         async with self.db_manager.get_session() as session:
@@ -71,7 +72,8 @@ class LLMService:
             base_url=provider.base_url,
             created_at=provider.created_at,
             updated_at=provider.updated_at,
-            created_by=provider.created_by
+            created_by=provider.created_by,
+            is_enabled=provider.is_enabled
         )
     
     async def get_provider(self, provider_id: str) -> LLMProviderResponse:
@@ -145,6 +147,8 @@ class LLMService:
             # Update fields
             if update_data.name is not None:
                 provider.name = update_data.name
+            if update_data.provider_type is not None:
+                provider.provider_type = update_data.provider_type.value
             if update_data.status is not None:
                 provider.status = update_data.status.value
             if update_data.api_key is not None:
@@ -155,6 +159,8 @@ class LLMService:
                 provider.model_name = update_data.model_name
             if update_data.litellm_config is not None:
                 provider.litellm_config = update_data.litellm_config
+            if update_data.is_enabled is not None:
+                provider.is_enabled = update_data.is_enabled
             
             provider.updated_at = datetime.utcnow()
             
@@ -170,7 +176,8 @@ class LLMService:
                 base_url=provider.base_url,
                 created_at=provider.created_at,
                 updated_at=provider.updated_at,
-                created_by=provider.created_by
+                created_by=provider.created_by,
+                is_enabled=provider.is_enabled
             )
     
     async def delete_provider(self, provider_id: str) -> bool:
@@ -192,140 +199,333 @@ class LLMService:
     async def test_provider(self, provider_id: str) -> Dict[str, Any]:
         """Test LLM provider connection"""
         provider = await self.get_provider(provider_id)
-        
+        if not provider:
+            raise ValueError(f"Provider {provider_id} not found")
+
         try:
             if provider.provider_type == LLMProviderType.LITELLM:
-                return await self._test_litellm_provider(provider)
+                # Test LiteLLM connection
+                from litellm import completion
+                
+                # Use the provider's configuration
+                model_name = provider.model_name
+                api_key = provider.api_key
+                base_url = provider.base_url
+                litellm_config = provider.litellm_config or {}
+                
+                # Prepare test parameters
+                test_params = {
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": "Hello, this is a test message."}],
+                    "max_tokens": 10
+                }
+                
+                # Add provider-specific configuration
+                if api_key:
+                    test_params["api_key"] = api_key
+                if base_url:
+                    test_params["api_base"] = base_url
+                
+                # Add any additional LiteLLM config
+                test_params.update(litellm_config)
+                
+                response = completion(**test_params)
+                
+                return {
+                    "success": True,
+                    "message": "Connection successful",
+                    "response": response.choices[0].message.content if response.choices else "No response content"
+                }
+                
+            elif provider.provider_type == LLMProviderType.OPENAI:
+                # Test OpenAI connection
+                import httpx
+                
+                headers = {"Authorization": f"Bearer {provider.api_key}"}
+                url = f"{provider.base_url or 'https://api.openai.com'}/v1/models"
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url, headers=headers)
+                    response.raise_for_status()
+                    
+                return {
+                    "success": True,
+                    "message": "Connection successful",
+                    "models_count": len(response.json().get("data", []))
+                }
+                
+            elif provider.provider_type == LLMProviderType.ANTHROPIC:
+                # Test Anthropic connection
+                import httpx
+                
+                headers = {"x-api-key": provider.api_key}
+                url = f"{provider.base_url or 'https://api.anthropic.com'}/v1/models"
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url, headers=headers)
+                    response.raise_for_status()
+                    
+                return {
+                    "success": True,
+                    "message": "Connection successful",
+                    "models_count": len(response.json().get("data", []))
+                }
+                
             else:
-                return await self._test_standard_provider(provider)
+                return {
+                    "success": False,
+                    "message": f"Testing not implemented for provider type: {provider.provider_type}"
+                }
+                
         except Exception as e:
             logger.error(f"Error testing provider {provider_id}: {e}")
             return {
                 "success": False,
-                "error": str(e),
-                "provider_id": provider_id
+                "message": f"Connection failed: {str(e)}"
             }
-    
-    async def _test_litellm_provider(self, provider: LLMProviderResponse) -> Dict[str, Any]:
-        """Test LiteLLM provider"""
+
+    async def get_provider_models(self, provider_type: str, api_key: str = None, base_url: str = None, litellm_config: Dict = None) -> Dict[str, Any]:
+        """Get available models from a provider"""
         try:
-            # Get provider config from database
-            async with self.db_manager.get_session() as session:
-                result = await session.execute(
-                    select(LLMProvider).where(LLMProvider.provider_id == provider.provider_id)
-                )
-                db_provider = result.scalar_one()
+            # Get default base URL if not provided
+            if not base_url:
+                base_url = self._get_default_base_url(provider_type)
             
-            # Use LiteLLM for testing
-            from litellm import completion
-            
-            # Prepare test message
-            test_message = "Hello, this is a test message. Please respond with 'Test successful' if you can see this."
-            
-            # Call LiteLLM
-            response = completion(
-                model=provider.model_name,
-                messages=[{"role": "user", "content": test_message}],
-                api_key=db_provider.api_key,
-                base_url=db_provider.base_url,
-                **(db_provider.litellm_config or {})
-            )
-            
-            return {
-                "success": True,
-                "provider_id": provider.provider_id,
-                "response": response.choices[0].message.content,
-                "model": provider.model_name
-            }
-            
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "provider_id": provider.provider_id
-            }
-    
-    async def _test_standard_provider(self, provider: LLMProviderResponse) -> Dict[str, Any]:
-        """Test standard provider (OpenAI, Anthropic, etc.)"""
-        try:
-            # Get provider config from database
-            async with self.db_manager.get_session() as session:
-                result = await session.execute(
-                    select(LLMProvider).where(LLMProvider.provider_id == provider.provider_id)
-                )
-                db_provider = result.scalar_one()
-            
-            # Prepare test message
-            test_message = "Hello, this is a test message. Please respond with 'Test successful' if you can see this."
-            
-            # Make API call based on provider type
-            if provider.provider_type == LLMProviderType.OPENAI:
-                return await self._test_openai_provider(db_provider, test_message)
-            elif provider.provider_type == LLMProviderType.ANTHROPIC:
-                return await self._test_anthropic_provider(db_provider, test_message)
+            if provider_type == LLMProviderType.LITELLM:
+                # For LiteLLM, we need to know which provider to query
+                # This is a simplified approach - in practice, you might need more configuration
+                if not litellm_config:
+                    return {
+                        "success": False,
+                        "message": "LiteLLM requires configuration to determine which provider to query"
+                    }
+                
+                # Try to get models from the configured provider
+                try:
+                    from litellm import get_llm_provider
+                    provider_name = litellm_config.get("provider", "openai")
+                    models = get_llm_provider(provider_name)
+                    return {
+                        "success": True,
+                        "models": models,
+                        "message": f"Retrieved models from {provider_name}",
+                        "status": "active",
+                        "base_url": base_url
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"Failed to get LiteLLM models: {str(e)}",
+                        "status": "error",
+                        "error_details": str(e)
+                    }
+                
+            elif provider_type == LLMProviderType.OPENAI:
+                # Get OpenAI models
+                import httpx
+                
+                headers = {"Authorization": f"Bearer {api_key}"}
+                # Ensure we don't double up on /v1 in the URL
+                if base_url and base_url.endswith('/v1'):
+                    url = f"{base_url}/models"
+                elif base_url:
+                    url = f"{base_url}/v1/models"
+                else:
+                    url = "https://api.openai.com/v1/models"
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url, headers=headers)
+                    response.raise_for_status()
+                    
+                models_data = response.json().get("data", [])
+                models = [
+                    {
+                        "id": model["id"],
+                        "name": model["id"],
+                        "object": model.get("object", "model"),
+                        "created": model.get("created"),
+                        "owned_by": model.get("owned_by", "openai")
+                    }
+                    for model in models_data
+                ]
+                
+                return {
+                    "success": True,
+                    "models": models,
+                    "message": f"Retrieved {len(models)} models from OpenAI",
+                    "status": "active",
+                    "base_url": base_url
+                }
+                
+            elif provider_type == LLMProviderType.ANTHROPIC:
+                # Get Anthropic models
+                import httpx
+                
+                # Anthropic doesn't have a /models endpoint like OpenAI
+                # Instead, we'll provide common Anthropic models
+                common_models = [
+                    {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus", "object": "model"},
+                    {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet", "object": "model"},
+                    {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku", "object": "model"},
+                    {"id": "claude-2.1", "name": "Claude 2.1", "object": "model"},
+                    {"id": "claude-2.0", "name": "Claude 2.0", "object": "model"},
+                    {"id": "claude-instant-1.2", "name": "Claude Instant 1.2", "object": "model"}
+                ]
+                
+                # If API key is provided, try to test the connection
+                if api_key:
+                    try:
+                        headers = {
+                            "x-api-key": api_key,
+                            "anthropic-version": "2023-06-01",
+                            "Content-Type": "application/json"
+                        }
+                        
+                        # Test with a simple message request to verify the API key
+                        # Ensure we don't double up on /v1 in the URL
+                        if base_url and base_url.endswith('/v1'):
+                            test_url = f"{base_url}/messages"
+                        elif base_url:
+                            test_url = f"{base_url}/v1/messages"
+                        else:
+                            test_url = "https://api.anthropic.com/v1/messages"
+                        test_data = {
+                            "model": "claude-3-haiku-20240307",
+                            "max_tokens": 1,
+                            "messages": [{"role": "user", "content": "test"}]
+                        }
+                        
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(test_url, headers=headers, json=test_data)
+                            response.raise_for_status()
+                        
+                        return {
+                            "success": True,
+                            "models": common_models,
+                            "message": f"Retrieved {len(common_models)} common Anthropic models",
+                            "status": "active",
+                            "base_url": base_url
+                        }
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "models": common_models,
+                            "message": f"API key validation failed: {str(e)}",
+                            "status": "error",
+                            "error_details": str(e),
+                            "base_url": base_url
+                        }
+                else:
+                    return {
+                        "success": True,
+                        "models": common_models,
+                        "message": f"Retrieved {len(common_models)} common Anthropic models (API key required for validation)",
+                        "status": "inactive",
+                        "base_url": base_url
+                    }
+                
+            elif provider_type == LLMProviderType.GOOGLE:
+                # Get Google models (simplified - you might need more configuration)
+                return {
+                    "success": True,
+                    "models": [
+                        {"id": "gemini-pro", "name": "Gemini Pro", "object": "model"},
+                        {"id": "gemini-pro-vision", "name": "Gemini Pro Vision", "object": "model"},
+                        {"id": "text-bison-001", "name": "Text Bison", "object": "model"}
+                    ],
+                    "message": "Common Google models (API key required for full list)",
+                    "status": "active" if api_key else "inactive",
+                    "base_url": base_url
+                }
+                
+            elif provider_type == LLMProviderType.AZURE:
+                # Get Azure models (simplified - you might need more configuration)
+                return {
+                    "success": True,
+                    "models": [
+                        {"id": "gpt-35-turbo", "name": "GPT-3.5 Turbo", "object": "model"},
+                        {"id": "gpt-4", "name": "GPT-4", "object": "model"},
+                        {"id": "gpt-4-32k", "name": "GPT-4 32K", "object": "model"}
+                    ],
+                    "message": "Common Azure models (API key and endpoint required for full list)",
+                    "status": "active" if api_key else "inactive",
+                    "base_url": base_url
+                }
+                
+            elif provider_type == LLMProviderType.CUSTOM:
+                return {
+                    "success": True,
+                    "models": [
+                        {"id": "custom-model", "name": "Custom Model", "object": "model"}
+                    ],
+                    "message": "Custom provider - configure model name manually",
+                    "status": "inactive",
+                    "base_url": base_url
+                }
+                
             else:
                 return {
                     "success": False,
-                    "error": f"Provider type {provider.provider_type} not implemented for testing",
-                    "provider_id": provider.provider_id
+                    "message": f"Provider type {provider_type} not supported for model listing",
+                    "status": "error"
                 }
                 
         except Exception as e:
+            logger.error(f"Error getting models for provider type {provider_type}: {e}")
             return {
                 "success": False,
-                "error": str(e),
-                "provider_id": provider.provider_id
+                "message": f"Failed to get models: {str(e)}",
+                "status": "error",
+                "error_details": str(e)
             }
-    
-    async def _test_openai_provider(self, provider: LLMProvider, test_message: str) -> Dict[str, Any]:
-        """Test OpenAI provider"""
-        url = f"{provider.base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {provider.api_key}",
-            "Content-Type": "application/json"
+
+    def _get_default_base_url(self, provider_type: str) -> str:
+        """Get default base URL for a provider type"""
+        default_urls = {
+            LLMProviderType.OPENAI: "https://api.openai.com/v1",
+            LLMProviderType.ANTHROPIC: "https://api.anthropic.com/v1",
+            LLMProviderType.GOOGLE: "https://generativelanguage.googleapis.com/v1",
+            LLMProviderType.AZURE: "https://your-resource.openai.azure.com",
+            LLMProviderType.LITELLM: "https://api.openai.com/v1",  # Default to OpenAI
+            LLMProviderType.CUSTOM: ""
         }
-        data = {
-            "model": provider.model_name,
-            "messages": [{"role": "user", "content": test_message}],
-            "max_tokens": 50
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=data)
-            response.raise_for_status()
+        return default_urls.get(provider_type, "")
+
+    async def test_provider_connection(self, provider_type: str, api_key: str = None, base_url: str = None, litellm_config: Dict = None) -> Dict[str, Any]:
+        """Test provider connection and return status with models"""
+        try:
+            # Get default base URL if not provided
+            if not base_url:
+                base_url = self._get_default_base_url(provider_type)
             
-            result = response.json()
-            return {
-                "success": True,
-                "provider_id": provider.provider_id,
-                "response": result["choices"][0]["message"]["content"],
-                "model": provider.model_name
-            }
-    
-    async def _test_anthropic_provider(self, provider: LLMProvider, test_message: str) -> Dict[str, Any]:
-        """Test Anthropic provider"""
-        url = f"{provider.base_url}/messages"
-        headers = {
-            "x-api-key": provider.api_key,
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01"
-        }
-        data = {
-            "model": provider.model_name,
-            "max_tokens": 50,
-            "messages": [{"role": "user", "content": test_message}]
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=data)
-            response.raise_for_status()
+            # Test connection and get models
+            result = await self.get_provider_models(provider_type, api_key, base_url, litellm_config)
             
-            result = response.json()
+            # Add connection test result
+            if result.get("success"):
+                result["connection_test"] = {
+                    "success": True,
+                    "message": "Connection successful"
+                }
+            else:
+                result["connection_test"] = {
+                    "success": False,
+                    "message": result.get("message", "Connection failed")
+                }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error testing provider connection: {e}")
             return {
-                "success": True,
-                "provider_id": provider.provider_id,
-                "response": result["content"][0]["text"],
-                "model": provider.model_name
+                "success": False,
+                "message": f"Connection test failed: {str(e)}",
+                "status": "error",
+                "error_details": str(e),
+                "connection_test": {
+                    "success": False,
+                    "message": f"Connection test failed: {str(e)}"
+                }
             }
     
     async def summarize_mcp_result(self, request: LLMSummaryRequest) -> LLMSummaryResponse:
@@ -378,7 +578,7 @@ class LLMService:
             else:
                 return await self._generate_standard_summary(provider, query, mcp_result)
         except Exception as e:
-            logger.error(f"Error generating summary with {provider.provider_type}: {e}")
+            logger.error(f"Error generating summary with {provider.provider_type}: {str(e)}")
             raise
     
     async def _generate_litellm_summary(self, provider: LLMProviderResponse, query: str, mcp_result: Dict[str, Any]) -> str:

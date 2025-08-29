@@ -5,8 +5,8 @@ This module provides REST API endpoints for managing LLM providers
 and integrating them with the MCP service.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Optional, Tuple
+from fastapi import APIRouter, Depends, HTTPException, Query, Form
 
 from app.api.middleware import get_current_user
 from app.models.llm import (
@@ -28,12 +28,13 @@ router = APIRouter()
 @router.post("/providers", response_model=LLMProviderResponse, tags=["LLM Providers"])
 async def create_llm_provider(
     provider_data: LLMProviderCreate,
-    current_user: str = Depends(get_current_user),
+    current_user: Tuple[str, str, list, list] = Depends(get_current_user),
     llm_service = Depends(get_llm_service)
 ):
     """Create a new LLM provider"""
     try:
-        return await llm_service.create_provider(provider_data, current_user)
+        user_id, tenant_id, roles, permissions = current_user
+        return await llm_service.create_provider(provider_data, user_id)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -82,6 +83,59 @@ async def get_provider_statuses():
         ]
     }
 
+@router.post("/providers/models", tags=["LLM Providers"])
+async def get_provider_models(
+    provider_type: str = Form(..., description="Provider type"),
+    api_key: Optional[str] = Form(None, description="API key for the provider"),
+    base_url: Optional[str] = Form(None, description="Base URL for the provider"),
+    litellm_config: Optional[str] = Form(None, description="LiteLLM configuration as JSON string"),
+    llm_service = Depends(get_llm_service)
+):
+    """Get available models from a provider type"""
+    try:
+        # Parse litellm_config if provided
+        parsed_litellm_config = None
+        if litellm_config:
+            import json
+            parsed_litellm_config = json.loads(litellm_config)
+        
+        result = await llm_service.get_provider_models(
+            provider_type=provider_type,
+            api_key=api_key,
+            base_url=base_url,
+            litellm_config=parsed_litellm_config
+        )
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get models: {str(e)}")
+
+@router.post("/providers/test-connection", tags=["LLM Providers"])
+async def test_provider_connection(
+    provider_type: str = Form(..., description="Provider type"),
+    api_key: Optional[str] = Form(None, description="API key for the provider"),
+    base_url: Optional[str] = Form(None, description="Base URL for the provider"),
+    litellm_config: Optional[str] = Form(None, description="LiteLLM configuration as JSON string"),
+    llm_service = Depends(get_llm_service)
+):
+    """Test provider connection and get models"""
+    try:
+        # Parse litellm_config if provided
+        parsed_litellm_config = None
+        if litellm_config:
+            import json
+            parsed_litellm_config = json.loads(litellm_config)
+        
+        result = await llm_service.test_provider_connection(
+            provider_type=provider_type,
+            api_key=api_key,
+            base_url=base_url,
+            litellm_config=parsed_litellm_config
+        )
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to test connection: {str(e)}")
 
 @router.get("/providers/{provider_id}", response_model=LLMProviderResponse, tags=["LLM Providers"])
 async def get_llm_provider(
@@ -89,12 +143,10 @@ async def get_llm_provider(
     llm_service = Depends(get_llm_service)
 ):
     """Get LLM provider by ID"""
-    try:
-        return await llm_service.get_provider(provider_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get provider: {str(e)}")
+    provider = await llm_service.get_provider(provider_id)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return provider
 
 
 @router.put("/providers/{provider_id}", response_model=LLMProviderResponse, tags=["LLM Providers"])

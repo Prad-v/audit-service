@@ -123,6 +123,7 @@ class LLMProvider(Base, TimestampMixin):
     
     # Metadata
     created_by = Column(String(255), nullable=True, index=True)
+    is_enabled = Column(Boolean, nullable=False, default=True, index=True)
     
     # Constraints
     __table_args__ = (
@@ -132,6 +133,7 @@ class LLMProvider(Base, TimestampMixin):
                        name='ck_llm_providers_type'),
         Index('idx_llm_providers_type_status', 'provider_type', 'status'),
         Index('idx_llm_providers_created_by', 'created_by'),
+        Index('idx_llm_providers_enabled', 'is_enabled'),
     )
 
 

@@ -64,23 +64,27 @@ class LLMProviderConfig(BaseModel):
 
 
 class LLMProviderCreate(BaseModel):
-    """Request model for creating LLM provider"""
-    name: str = Field(..., description="Provider display name")
-    provider_type: LLMProviderType = Field(..., description="Provider type")
-    api_key: Optional[str] = Field(None, description="API key for the provider")
-    base_url: Optional[str] = Field(None, description="Base URL for API calls")
-    model_name: str = Field(..., description="Model name to use")
-    litellm_config: Optional[Dict[str, Any]] = Field(None, description="LiteLLM specific configuration")
+    """Request model for creating an LLM provider"""
+    name: str
+    provider_type: LLMProviderType
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model_name: str
+    litellm_config: Optional[Dict[str, Any]] = None
+    status: LLMProviderStatus = LLMProviderStatus.INACTIVE
+    is_enabled: bool = True
 
 
 class LLMProviderUpdate(BaseModel):
-    """Request model for updating LLM provider"""
-    name: Optional[str] = Field(None, description="Provider display name")
-    status: Optional[LLMProviderStatus] = Field(None, description="Provider status")
-    api_key: Optional[str] = Field(None, description="API key for the provider")
-    base_url: Optional[str] = Field(None, description="Base URL for API calls")
-    model_name: Optional[str] = Field(None, description="Model name to use")
-    litellm_config: Optional[Dict[str, Any]] = Field(None, description="LiteLLM specific configuration")
+    """Request model for updating an LLM provider"""
+    name: Optional[str] = None
+    provider_type: Optional[LLMProviderType] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model_name: Optional[str] = None
+    litellm_config: Optional[Dict[str, Any]] = None
+    status: Optional[LLMProviderStatus] = None
+    is_enabled: Optional[bool] = None
 
 
 class LLMProviderResponse(BaseModel):
@@ -90,10 +94,14 @@ class LLMProviderResponse(BaseModel):
     provider_type: LLMProviderType
     status: LLMProviderStatus
     model_name: str
-    base_url: Optional[str]
+    base_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    created_by: Optional[str]
+    created_by: Optional[str] = None
+    is_enabled: bool = True
+
+    class Config:
+        from_attributes = True
 
 
 class LLMProviderListResponse(BaseModel):
