@@ -25,8 +25,116 @@ on:
         type: boolean
 
 jobs:
+  analyze-changes:
+    name: Analyze Changes
+    runs-on: ubuntu-latest
+    outputs:
+      change-summary: ${{ steps.changes.outputs.summary }}
+      files-changed: ${{ steps.changes.outputs.files }}
+      change-types: ${{ steps.changes.outputs.types }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for change analysis
+    
+    - name: Analyze changes
+      id: changes
+      run: |
+        # Get the previous commit for comparison
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, compare with the base branch
+          PREV_COMMIT="${{ github.event.pull_request.base.sha }}"
+        else
+          # For pushes, get the previous commit
+          PREV_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+        fi
+        
+        if [ -n "$PREV_COMMIT" ]; then
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only $PREV_COMMIT HEAD | tr '\n' ',' | sed 's/,$//')
+          
+          # Analyze change types
+          BACKEND_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(backend/|\.py$)' | wc -l)
+          FRONTEND_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(frontend/|\.(tsx?|jsx?|css|html)$)' | wc -l)
+          INFRA_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(docker-compose|Dockerfile|k8s/|terraform/|\.github/)' | wc -l)
+          DOC_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '\.(md|txt|rst)$' | wc -l)
+          TEST_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(tests/|test_)' | wc -l)
+          
+          # Create change types summary
+          CHANGE_TYPES=""
+          [ $BACKEND_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}backend,"
+          [ $FRONTEND_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}frontend,"
+          [ $INFRA_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}infrastructure,"
+          [ $DOC_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}documentation,"
+          [ $TEST_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}tests,"
+          CHANGE_TYPES=$(echo $CHANGE_TYPES | sed 's/,$//')
+          
+          # Create detailed summary
+          SUMMARY="## 📊 Change Analysis\n\n"
+          SUMMARY="${SUMMARY}**Repository:** ${{ github.repository }}\n"
+          SUMMARY="${SUMMARY}**Branch:** ${{ github.ref_name }}\n"
+          SUMMARY="${SUMMARY}**Commit:** ${{ github.sha }}\n"
+          SUMMARY="${SUMMARY}**Author:** ${{ github.actor }}\n"
+          SUMMARY="${SUMMARY}**Event:** ${{ github.event_name }}\n\n"
+          
+          SUMMARY="${SUMMARY}### 📈 Change Statistics\n\n"
+          SUMMARY="${SUMMARY}- **Backend Changes:** $BACKEND_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Frontend Changes:** $FRONTEND_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Infrastructure Changes:** $INFRA_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Documentation Changes:** $DOC_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Test Changes:** $TEST_CHANGES files\n\n"
+          
+          SUMMARY="${SUMMARY}### 🔄 Change Types\n\n"
+          SUMMARY="${SUMMARY}**Areas Modified:** $CHANGE_TYPES\n\n"
+          
+          SUMMARY="${SUMMARY}### 📝 Recent Commits\n\n"
+          SUMMARY="${SUMMARY}\`\`\`\n"
+          SUMMARY="${SUMMARY}$(git log --oneline $PREV_COMMIT..HEAD | head -5)\n"
+          SUMMARY="${SUMMARY}\`\`\`\n\n"
+          
+          SUMMARY="${SUMMARY}### 📁 Changed Files\n\n"
+          SUMMARY="${SUMMARY}\`\`\`\n"
+          SUMMARY="${SUMMARY}$(git diff --name-only $PREV_COMMIT HEAD | head -20)\n"
+          if [ $(git diff --name-only $PREV_COMMIT HEAD | wc -l) -gt 20 ]; then
+            SUMMARY="${SUMMARY}... and $(($(git diff --name-only $PREV_COMMIT HEAD | wc -l) - 20)) more files\n"
+          fi
+          SUMMARY="${SUMMARY}\`\`\`\n"
+          
+        else
+          # First commit or no previous commit
+          SUMMARY="## 📊 Change Analysis\n\n"
+          SUMMARY="${SUMMARY}**Repository:** ${{ github.repository }}\n"
+          SUMMARY="${SUMMARY}**Branch:** ${{ github.ref_name }}\n"
+          SUMMARY="${SUMMARY}**Commit:** ${{ github.sha }}\n"
+          SUMMARY="${SUMMARY}**Author:** ${{ github.actor }}\n"
+          SUMMARY="${SUMMARY}**Event:** ${{ github.event_name }}\n\n"
+          SUMMARY="${SUMMARY}### 🎉 Initial Commit\n\n"
+          SUMMARY="${SUMMARY}This appears to be the initial commit or first push to this branch.\n\n"
+          
+          CHANGED_FILES="initial"
+          CHANGE_TYPES="initial"
+        fi
+        
+        # Set outputs
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo "$SUMMARY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        echo "types=$CHANGE_TYPES" >> $GITHUB_OUTPUT
+        
+        # Print summary to logs
+        echo "$SUMMARY"
+    
+    - name: Create change summary
+      run: |
+        echo "${{ steps.changes.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+
   test:
     runs-on: ubuntu-latest
+    needs: analyze-changes
     
     strategy:
       matrix:
@@ -163,7 +271,7 @@ jobs:
         docker system prune -f
 
   test-summary:
-    needs: test
+    needs: [analyze-changes, test]
     runs-on: ubuntu-latest
     if: always()
     
@@ -177,10 +285,39 @@ jobs:
         name: test-results
         path: test-results/
     
-    - name: Generate test summary
+    - name: Generate comprehensive test summary
       run: |
-        echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## 🧪 Test Suite Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Test execution completed." >> $GITHUB_STEP_SUMMARY
+        
+        # Add change analysis
+        echo "${{ needs.analyze-changes.outputs.change-summary }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Note:** Check the individual test job logs for detailed results." >> $GITHUB_STEP_SUMMARY
+        
+        # Add test status
+        echo "### 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.test.result }}" = "success" ]; then
+          echo "✅ **Overall Status:** All tests passed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Overall Status:** Some tests failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Test Coverage" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Unit Tests:** Backend Python tests with pytest" >> $GITHUB_STEP_SUMMARY
+        echo "- **Integration Tests:** API integration tests" >> $GITHUB_STEP_SUMMARY
+        echo "- **E2E Tests:** End-to-end frontend-backend tests" >> $GITHUB_STEP_SUMMARY
+        echo "- **Security Tests:** Security vulnerability scanning" >> $GITHUB_STEP_SUMMARY
+        echo "- **Load Tests:** Performance testing with Locust" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### 📁 Test Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Test results and coverage reports are available as workflow artifacts." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "*This summary was automatically generated by the test workflow.*" >> $GITHUB_STEP_SUMMARY

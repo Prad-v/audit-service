@@ -1,0 +1,53 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace.name }}
+  {{- with .Values.namespace.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.namespace.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- if .Values.resources.quota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Values.app.name }}-quota
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resources.quota.cpu.requests | quote }}
+    requests.memory: {{ .Values.resources.quota.memory.requests | quote }}
+    limits.cpu: {{ .Values.resources.quota.cpu.limits | quote }}
+    limits.memory: {{ .Values.resources.quota.memory.limits | quote }}
+    persistentvolumeclaims: {{ .Values.resources.quota.storage.persistentvolumeclaims | quote }}
+    services: {{ .Values.resources.quota.storage.services | quote }}
+    secrets: {{ .Values.resources.quota.storage.secrets | quote }}
+    configmaps: {{ .Values.resources.quota.storage.configmaps | quote }}
+---
+{{- end }}
+{{- if .Values.resources.limits.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ .Values.app.name }}-limits
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+spec:
+  limits:
+  - default:
+      cpu: {{ .Values.resources.limits.default.cpu | quote }}
+      memory: {{ .Values.resources.limits.default.memory | quote }}
+    defaultRequest:
+      cpu: {{ .Values.resources.limits.defaultRequest.cpu | quote }}
+      memory: {{ .Values.resources.limits.defaultRequest.memory | quote }}
+    type: Container
+{{- end }}
+{{- end }}

@@ -1,0 +1,98 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "audit-service.worker.name" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.worker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    {{- toYaml .Values.worker.strategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "audit-service.worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "audit-service.worker.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- with .Values.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "audit-service.serviceAccountName" . }}
+      {{- with .Values.security.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: worker
+        image: {{ include "audit-service.worker.image" . }}
+        imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+        command: {{ .Values.worker.command }}
+        {{- with .Values.security.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        env:
+        {{- include "audit-service.backend.env" . | nindent 8 }}
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "audit-service.secretName" . }}
+              key: DATABASE_URL
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "audit-service.secretName" . }}
+              key: JWT_SECRET_KEY
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "audit-service.secretName" . }}
+              key: REDIS_URL
+        - name: NATS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "audit-service.secretName" . }}
+              key: NATS_URL
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/var/secrets/google/key.json"
+        resources:
+          {{- toYaml .Values.worker.resources | nindent 10 }}
+        volumeMounts:
+        - name: google-credentials
+          mountPath: /var/secrets/google
+          readOnly: true
+        {{- with .Values.worker.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: google-credentials
+        secret:
+          secretName: {{ include "audit-service.secretName" . }}
+          items:
+          - key: GOOGLE_CREDENTIALS
+            path: key.json
+      {{- with .Values.worker.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -15,9 +15,120 @@ env:
   REGION: us-central1
 
 jobs:
+  analyze-changes:
+    name: Analyze Changes
+    runs-on: ubuntu-latest
+    outputs:
+      change-summary: ${{ steps.changes.outputs.summary }}
+      files-changed: ${{ steps.changes.outputs.files }}
+      change-types: ${{ steps.changes.outputs.types }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for change analysis
+    
+    - name: Analyze changes
+      id: changes
+      run: |
+        # Get the previous commit for comparison
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, compare with the base branch
+          PREV_COMMIT="${{ github.event.pull_request.base.sha }}"
+        else
+          # For pushes, get the previous commit
+          PREV_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+        fi
+        
+        if [ -n "$PREV_COMMIT" ]; then
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only $PREV_COMMIT HEAD | tr '\n' ',' | sed 's/,$//')
+          
+          # Get commit messages
+          COMMIT_MESSAGES=$(git log --oneline $PREV_COMMIT..HEAD | head -10 | tr '\n' '|' | sed 's/|$//')
+          
+          # Analyze change types
+          BACKEND_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(backend/|\.py$)' | wc -l)
+          FRONTEND_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(frontend/|\.(tsx?|jsx?|css|html)$)' | wc -l)
+          INFRA_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(docker-compose|Dockerfile|k8s/|terraform/|\.github/)' | wc -l)
+          DOC_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '\.(md|txt|rst)$' | wc -l)
+          TEST_CHANGES=$(git diff --name-only $PREV_COMMIT HEAD | grep -E '^(tests/|test_)' | wc -l)
+          
+          # Create change types summary
+          CHANGE_TYPES=""
+          [ $BACKEND_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}backend,"
+          [ $FRONTEND_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}frontend,"
+          [ $INFRA_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}infrastructure,"
+          [ $DOC_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}documentation,"
+          [ $TEST_CHANGES -gt 0 ] && CHANGE_TYPES="${CHANGE_TYPES}tests,"
+          CHANGE_TYPES=$(echo $CHANGE_TYPES | sed 's/,$//')
+          
+          # Create detailed summary
+          SUMMARY="## 📊 Change Analysis\n\n"
+          SUMMARY="${SUMMARY}**Repository:** ${{ github.repository }}\n"
+          SUMMARY="${SUMMARY}**Branch:** ${{ github.ref_name }}\n"
+          SUMMARY="${SUMMARY}**Commit:** ${{ github.sha }}\n"
+          SUMMARY="${SUMMARY}**Author:** ${{ github.actor }}\n"
+          SUMMARY="${SUMMARY}**Event:** ${{ github.event_name }}\n\n"
+          
+          SUMMARY="${SUMMARY}### 📈 Change Statistics\n\n"
+          SUMMARY="${SUMMARY}- **Backend Changes:** $BACKEND_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Frontend Changes:** $FRONTEND_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Infrastructure Changes:** $INFRA_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Documentation Changes:** $DOC_CHANGES files\n"
+          SUMMARY="${SUMMARY}- **Test Changes:** $TEST_CHANGES files\n\n"
+          
+          SUMMARY="${SUMMARY}### 🔄 Change Types\n\n"
+          SUMMARY="${SUMMARY}**Areas Modified:** $CHANGE_TYPES\n\n"
+          
+          SUMMARY="${SUMMARY}### 📝 Recent Commits\n\n"
+          SUMMARY="${SUMMARY}\`\`\`\n"
+          SUMMARY="${SUMMARY}$(git log --oneline $PREV_COMMIT..HEAD | head -5)\n"
+          SUMMARY="${SUMMARY}\`\`\`\n\n"
+          
+          SUMMARY="${SUMMARY}### 📁 Changed Files\n\n"
+          SUMMARY="${SUMMARY}\`\`\`\n"
+          SUMMARY="${SUMMARY}$(git diff --name-only $PREV_COMMIT HEAD | head -20)\n"
+          if [ $(git diff --name-only $PREV_COMMIT HEAD | wc -l) -gt 20 ]; then
+            SUMMARY="${SUMMARY}... and $(($(git diff --name-only $PREV_COMMIT HEAD | wc -l) - 20)) more files\n"
+          fi
+          SUMMARY="${SUMMARY}\`\`\`\n"
+          
+        else
+          # First commit or no previous commit
+          SUMMARY="## 📊 Change Analysis\n\n"
+          SUMMARY="${SUMMARY}**Repository:** ${{ github.repository }}\n"
+          SUMMARY="${SUMMARY}**Branch:** ${{ github.ref_name }}\n"
+          SUMMARY="${SUMMARY}**Commit:** ${{ github.sha }}\n"
+          SUMMARY="${SUMMARY}**Author:** ${{ github.actor }}\n"
+          SUMMARY="${SUMMARY}**Event:** ${{ github.event_name }}\n\n"
+          SUMMARY="${SUMMARY}### 🎉 Initial Commit\n\n"
+          SUMMARY="${SUMMARY}This appears to be the initial commit or first push to this branch.\n\n"
+          
+          CHANGED_FILES="initial"
+          CHANGE_TYPES="initial"
+        fi
+        
+        # Set outputs
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo "$SUMMARY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        echo "types=$CHANGE_TYPES" >> $GITHUB_OUTPUT
+        
+        # Print summary to logs
+        echo "$SUMMARY"
+    
+    - name: Create change summary
+      run: |
+        echo "${{ steps.changes.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    needs: analyze-changes
     
     services:
       postgres:
@@ -131,7 +242,7 @@ jobs:
   security-scan:
     name: Security Scanning
     runs-on: ubuntu-latest
-    needs: test
+    needs: [analyze-changes, test]
     
     steps:
     - name: Checkout code
@@ -166,7 +277,7 @@ jobs:
   build:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    needs: [test, security-scan]
+    needs: [analyze-changes, test, security-scan]
     if: github.event_name == 'push' || github.event_name == 'release'
     
     steps:
@@ -219,16 +330,165 @@ jobs:
         cache-to: type=gha,mode=max
         platforms: linux/amd64,linux/arm64
 
+  helm-package:
+    name: Package and Publish Helm Chart
+    runs-on: ubuntu-latest
+    needs: [analyze-changes, build]
+    if: github.event_name == 'push' || github.event_name == 'release'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.12.0
+    
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    - name: Generate Helm chart version
+      id: chart-version
+      run: |
+        # Generate version based on commit and changes
+        CHART_VERSION=$(python3 -c "
+        import re
+        import subprocess
+        
+        # Get commit count and hash
+        commit_count = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD']).decode().strip()
+        commit_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
+        
+        # Get change types from previous job
+        change_types = '${{ needs.analyze-changes.outputs.change-types }}'
+        
+        # Determine version bump based on change types
+        if 'infrastructure' in change_types or 'backend' in change_types:
+            version_bump = 'major'
+        elif 'frontend' in change_types:
+            version_bump = 'minor'
+        else:
+            version_bump = 'patch'
+        
+        # Generate semantic version
+        if version_bump == 'major':
+            version = f'1.{commit_count}.{commit_hash}'
+        elif version_bump == 'minor':
+            version = f'0.1.{commit_count}-{commit_hash}'
+        else:
+            version = f'0.0.{commit_count}-{commit_hash}'
+        
+        print(version)
+        ")
+        
+        echo "chart_version=$CHART_VERSION" >> $GITHUB_OUTPUT
+        echo "Generated chart version: $CHART_VERSION"
+    
+    - name: Update Chart.yaml version
+      run: |
+        cd helm/audit-service
+        sed -i "s/version: .*/version: ${{ steps.chart-version.outputs.chart_version }}/" Chart.yaml
+        sed -i "s/appVersion: .*/appVersion: \"${{ github.sha }}\"/" Chart.yaml
+        echo "Updated Chart.yaml:"
+        cat Chart.yaml
+    
+    - name: Package Helm chart
+      run: |
+        cd helm
+        helm package audit-service/
+        echo "Generated chart package:"
+        ls -la *.tgz
+    
+    - name: Validate Helm chart
+      run: |
+        cd helm
+        helm lint audit-service/
+        helm template audit-service/ --values values/values-prod.yaml --namespace audit-service > /tmp/rendered.yaml
+        echo "Chart validation completed"
+    
+    - name: Upload Helm chart artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: helm-chart
+        path: helm/*.tgz
+        retention-days: 30
+    
+    - name: Publish to GitHub Packages (Helm Registry)
+      if: github.event_name == 'release'
+      run: |
+        cd helm
+        echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+        helm push audit-service-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+        echo "Published chart to GitHub Packages"
+    
+    - name: Publish to OCI Registry
+      if: github.event_name == 'release'
+      run: |
+        cd helm
+        echo ${{ secrets.GCP_SA_KEY }} | helm registry login gcr.io -u _json_key --password-stdin
+        helm push audit-service-*.tgz oci://gcr.io/${{ env.PROJECT_ID }}/charts
+        echo "Published chart to GCR OCI Registry"
+    
+    - name: Create Helm chart summary
+      run: |
+        echo "## 📦 Helm Chart Package" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Chart Version:** ${{ steps.chart-version.outputs.chart_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**App Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Change Types:** ${{ needs.analyze-changes.outputs.change-types }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📁 Chart Contents" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Backend Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "- Frontend Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "- Worker Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "- Services (Backend, Frontend)" >> $GITHUB_STEP_SUMMARY
+        echo "- Ingress Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- HPA (Horizontal Pod Autoscaler)" >> $GITHUB_STEP_SUMMARY
+        echo "- RBAC (ServiceAccount, Role, RoleBinding)" >> $GITHUB_STEP_SUMMARY
+        echo "- ConfigMaps and Secrets" >> $GITHUB_STEP_SUMMARY
+        echo "- Resource Quotas and Limits" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Installation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "helm install audit-service ./helm/audit-service-*.tgz \\" >> $GITHUB_STEP_SUMMARY
+        echo "  --namespace audit-service \\" >> $GITHUB_STEP_SUMMARY
+        echo "  --create-namespace \\" >> $GITHUB_STEP_SUMMARY
+                echo "  --set image.tag=${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: build
+    needs: [analyze-changes, build, helm-package]
     if: github.ref == 'refs/heads/develop'
     environment: staging
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
+    - name: Download Helm chart
+      uses: actions/download-artifact@v3
+      with:
+        name: helm-chart
+        path: helm/
+    
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.12.0
     
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v1
@@ -244,33 +504,51 @@ jobs:
           --region ${{ env.REGION }} \
           --project ${{ env.PROJECT_ID }}
     
-    - name: Deploy to staging
+    - name: Deploy to staging with Helm
       run: |
-        # Update image tags in Kubernetes manifests
-        sed -i "s|gcr.io/PROJECT_ID|${{ env.REGISTRY }}/${{ env.PROJECT_ID }}|g" k8s/*.yaml
-        sed -i "s|:latest|:${{ github.sha }}|g" k8s/*.yaml
+        # Install or upgrade the Helm chart
+        if helm list -n audit-service-staging | grep -q audit-service-staging; then
+          echo "Upgrading existing deployment..."
+          helm upgrade audit-service-staging ./helm/audit-service-*.tgz \
+            --namespace audit-service-staging \
+            --values values/values-staging.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set worker.image.tag=${{ github.sha }} \
+            --wait --timeout=10m
+        else
+          echo "Installing new deployment..."
+          helm install audit-service-staging ./helm/audit-service-*.tgz \
+            --namespace audit-service-staging \
+            --create-namespace \
+            --values values/values-staging.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set worker.image.tag=${{ github.sha }} \
+            --wait --timeout=10m
+        fi
         
-        # Apply Kubernetes manifests
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/secret.yaml
-        kubectl apply -f k8s/serviceaccount.yaml
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/ingress.yaml
-        kubectl apply -f k8s/hpa.yaml
-        
-        # Wait for deployment to complete
-        kubectl rollout status deployment/audit-service-backend -n audit-service --timeout=300s
-        kubectl rollout status deployment/audit-service-worker -n audit-service --timeout=300s
+        # Wait for all deployments to be ready
+        kubectl wait --for=condition=available --timeout=300s deployment/audit-service-staging-backend -n audit-service-staging
+        kubectl wait --for=condition=available --timeout=300s deployment/audit-service-staging-frontend -n audit-service-staging
+        kubectl wait --for=condition=available --timeout=300s deployment/audit-service-staging-worker -n audit-service-staging
     
     - name: Run smoke tests
       run: |
         # Wait for service to be ready
         sleep 30
         
-        # Get service URL
-        SERVICE_URL=$(kubectl get ingress audit-service-ingress -n audit-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        # Get service URL from ingress
+        SERVICE_URL=$(kubectl get ingress -n audit-service-staging -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+        
+        if [ -z "$SERVICE_URL" ]; then
+          echo "Using hostname instead of IP"
+          SERVICE_URL=$(kubectl get ingress -n audit-service-staging -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}')
+        fi
+        
+        echo "Service URL: $SERVICE_URL"
         
         # Run basic health check
         curl -f http://$SERVICE_URL/health || exit 1
@@ -282,13 +560,24 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: build
+    needs: [analyze-changes, build, helm-package]
     if: github.event_name == 'release'
     environment: production
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
+    - name: Download Helm chart
+      uses: actions/download-artifact@v3
+      with:
+        name: helm-chart
+        path: helm/
+    
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.12.0
     
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v1
@@ -311,33 +600,51 @@ jobs:
         terraform plan -var="environment=production" -var="image_tag=${{ github.sha }}"
         terraform apply -auto-approve -var="environment=production" -var="image_tag=${{ github.sha }}"
     
-    - name: Deploy to production
+    - name: Deploy to production with Helm
       run: |
-        # Update image tags in Kubernetes manifests
-        sed -i "s|gcr.io/PROJECT_ID|${{ env.REGISTRY }}/${{ env.PROJECT_ID }}|g" k8s/*.yaml
-        sed -i "s|:latest|:${{ github.sha }}|g" k8s/*.yaml
+        # Install or upgrade the Helm chart
+        if helm list -n audit-service | grep -q audit-service; then
+          echo "Upgrading existing production deployment..."
+          helm upgrade audit-service ./helm/audit-service-*.tgz \
+            --namespace audit-service \
+            --values values/values-prod.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set worker.image.tag=${{ github.sha }} \
+            --wait --timeout=15m
+        else
+          echo "Installing new production deployment..."
+          helm install audit-service ./helm/audit-service-*.tgz \
+            --namespace audit-service \
+            --create-namespace \
+            --values values/values-prod.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set backend.image.tag=${{ github.sha }} \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set worker.image.tag=${{ github.sha }} \
+            --wait --timeout=15m
+        fi
         
-        # Apply Kubernetes manifests with production configuration
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/secret.yaml
-        kubectl apply -f k8s/serviceaccount.yaml
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/ingress.yaml
-        kubectl apply -f k8s/hpa.yaml
-        
-        # Wait for deployment to complete
-        kubectl rollout status deployment/audit-service-backend -n audit-service --timeout=600s
-        kubectl rollout status deployment/audit-service-worker -n audit-service --timeout=600s
+        # Wait for all deployments to be ready
+        kubectl wait --for=condition=available --timeout=600s deployment/audit-service-backend -n audit-service
+        kubectl wait --for=condition=available --timeout=600s deployment/audit-service-frontend -n audit-service
+        kubectl wait --for=condition=available --timeout=600s deployment/audit-service-worker -n audit-service
     
     - name: Run production health checks
       run: |
         # Wait for service to be ready
         sleep 60
         
-        # Get service URL
-        SERVICE_URL=$(kubectl get ingress audit-service-ingress -n audit-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        # Get service URL from ingress
+        SERVICE_URL=$(kubectl get ingress -n audit-service -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+        
+        if [ -z "$SERVICE_URL" ]; then
+          echo "Using hostname instead of IP"
+          SERVICE_URL=$(kubectl get ingress -n audit-service -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}')
+        fi
+        
+        echo "Service URL: $SERVICE_URL"
         
         # Run comprehensive health checks
         curl -f https://$SERVICE_URL/health || exit 1
@@ -357,13 +664,14 @@ jobs:
           Version: ${{ github.ref_name }}
           Commit: ${{ github.sha }}
           Environment: Production
+          Changes: ${{ needs.analyze-changes.outputs.change-types }}
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   load-test:
     name: Load Testing
     runs-on: ubuntu-latest
-    needs: deploy-staging
+    needs: [analyze-changes, deploy-staging]
     if: github.ref == 'refs/heads/develop'
     
     steps:
@@ -414,10 +722,95 @@ jobs:
           tests/load/load-test-report.html
           tests/load/load-test-results_*.csv
 
+  summary:
+    name: Generate Summary
+    runs-on: ubuntu-latest
+    needs: [analyze-changes, test, security-scan, build, helm-package, deploy-staging, deploy-production, load-test]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Generate comprehensive summary
+      run: |
+        echo "## 🎯 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add change analysis
+        echo "${{ needs.analyze-changes.outputs.change-summary }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add job status summary
+        echo "### 🔄 Job Status" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.test.result }}" = "success" ]; then
+          echo "✅ **Tests:** All tests passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Tests:** Some tests failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.security-scan.result }}" = "success" ]; then
+          echo "✅ **Security Scan:** Security checks passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Security Scan:** Security issues found" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.build.result }}" = "success" ]; then
+          echo "✅ **Build:** Images built and pushed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Build:** Build failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.helm-package.result }}" = "success" ]; then
+          echo "✅ **Helm Chart:** Chart packaged and published successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Helm Chart:** Chart packaging failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.deploy-staging.result }}" = "success" ]; then
+          echo "✅ **Staging Deployment:** Successfully deployed to staging" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.deploy-staging.result }}" = "skipped" ]; then
+          echo "⏭️ **Staging Deployment:** Skipped (not develop branch)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Staging Deployment:** Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.deploy-production.result }}" = "success" ]; then
+          echo "✅ **Production Deployment:** Successfully deployed to production" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.deploy-production.result }}" = "skipped" ]; then
+          echo "⏭️ **Production Deployment:** Skipped (not release event)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Production Deployment:** Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.load-test.result }}" = "success" ]; then
+          echo "✅ **Load Testing:** Load tests completed successfully" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.load-test.result }}" = "skipped" ]; then
+          echo "⏭️ **Load Testing:** Skipped (not develop branch)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Load Testing:** Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add overall status
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "### 🎉 Overall Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "*This summary was automatically generated by the CI/CD pipeline.*" >> $GITHUB_STEP_SUMMARY
+
   cleanup:
     name: Cleanup
     runs-on: ubuntu-latest
-    needs: [deploy-staging, deploy-production, load-test]
+    needs: [summary]
     if: always()
     
     steps:

@@ -1,0 +1,386 @@
+# Default values for audit-service
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  environment: production
+  imageRegistry: gcr.io
+  imagePullSecrets:
+    - name: audit-service-registry
+
+# Image configuration
+image:
+  repository: PROJECT_ID/audit-service
+  tag: latest
+  pullPolicy: Always
+  frontend:
+    repository: PROJECT_ID/audit-service-frontend
+    tag: latest
+    pullPolicy: Always
+
+# Application configuration
+app:
+  name: audit-service
+  version: "1.0.0"
+  replicas:
+    backend: 3
+    frontend: 2
+    worker: 2
+
+# Namespace configuration
+namespace:
+  create: true
+  name: audit-service
+  annotations: {}
+  labels:
+    environment: production
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: namespace
+
+# Resource quotas and limits
+resources:
+  quota:
+    enabled: true
+    cpu:
+      requests: "4"
+      limits: "8"
+    memory:
+      requests: 8Gi
+      limits: 16Gi
+    storage:
+      persistentvolumeclaims: "10"
+      services: "10"
+      secrets: "20"
+      configmaps: "20"
+  
+  limits:
+    enabled: true
+    default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+
+# Backend configuration
+backend:
+  enabled: true
+  image:
+    repository: gcr.io/PROJECT_ID/audit-service-backend
+    tag: latest
+    pullPolicy: Always
+  
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  ports:
+    http: 8000
+    metrics: 8000
+  
+  env:
+    # Application Configuration
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"
+    API_V1_STR: "/api/v1"
+    PROJECT_NAME: "Audit Service"
+    
+    # Database Configuration
+    DATABASE_TYPE: "bigquery"
+    DATABASE_POOL_SIZE: "20"
+    DATABASE_MAX_OVERFLOW: "30"
+    DATABASE_POOL_TIMEOUT: "30"
+    DATABASE_POOL_RECYCLE: "3600"
+    
+    # BigQuery Configuration
+    BIGQUERY_DATASET: "audit_logs"
+    BIGQUERY_TABLE: "audit_events"
+    BIGQUERY_LOCATION: "US"
+    
+    # Pub/Sub Configuration
+    USE_PUBSUB: "true"
+    PUBSUB_TOPIC_NAME: "audit-events"
+    PUBSUB_SUBSCRIPTION_NAME: "audit-processor"
+    PUBSUB_MAX_MESSAGES: "100"
+    PUBSUB_ACK_DEADLINE: "60"
+    PUBSUB_RETENTION: "604800"
+    PUBSUB_ORDERING: "false"
+    PUBSUB_EXACTLY_ONCE: "false"
+    
+    # Redis Configuration
+    REDIS_HOST: "redis-service"
+    REDIS_PORT: "6379"
+    REDIS_DB: "0"
+    REDIS_MAX_CONNECTIONS: "20"
+    REDIS_RETRY_ON_TIMEOUT: "true"
+    REDIS_SOCKET_KEEPALIVE: "true"
+    REDIS_SOCKET_KEEPALIVE_OPTIONS: "1,3,5"
+    
+    # Cache Configuration
+    CACHE_TTL: "300"
+    CACHE_MAX_SIZE: "1000"
+    CACHE_ENABLED: "true"
+    
+    # Security Configuration
+    JWT_ALGORITHM: "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+    API_KEY_EXPIRE_DAYS: "365"
+    
+    # Rate Limiting
+    RATE_LIMIT_ENABLED: "true"
+    RATE_LIMIT_REQUESTS: "1000"
+    RATE_LIMIT_WINDOW: "3600"
+    
+    # Monitoring Configuration
+    METRICS_ENABLED: "true"
+    METRICS_PORT: "8000"
+    HEALTH_CHECK_INTERVAL: "30"
+    
+    # Worker Configuration
+    WORKER_CONCURRENCY: "4"
+    WORKER_MAX_RETRIES: "3"
+    WORKER_RETRY_DELAY: "5"
+    BATCH_SIZE: "100"
+    BATCH_TIMEOUT: "5"
+    
+    # CORS Configuration
+    CORS_ORIGINS: "https://backstage.example.com,https://audit.example.com"
+    CORS_CREDENTIALS: "true"
+    CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+    CORS_HEADERS: "Content-Type,Authorization,X-Tenant-ID,X-Correlation-ID"
+
+# Frontend configuration
+frontend:
+  enabled: true
+  image:
+    repository: gcr.io/PROJECT_ID/audit-service-frontend
+    tag: latest
+    pullPolicy: Always
+  
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  ports:
+    http: 80
+  
+  env:
+    NODE_ENV: "production"
+    VITE_API_URL: "http://audit-service-backend:8000"
+
+# Worker configuration
+worker:
+  enabled: true
+  image:
+    repository: gcr.io/PROJECT_ID/audit-service-backend
+    tag: latest
+    pullPolicy: Always
+  
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  command: ["python", "-m", "app.worker"]
+
+# Service configuration
+service:
+  backend:
+    enabled: true
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    annotations: {}
+  
+  frontend:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+    annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  
+  hosts:
+    - host: audit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: audit-service-frontend
+            port: 80
+        - path: /api
+          pathType: Prefix
+          service:
+            name: audit-service-backend
+            port: 8000
+  
+  tls:
+    - secretName: audit-service-tls
+      hosts:
+        - audit.example.com
+
+# Horizontal Pod Autoscaler configuration
+hpa:
+  backend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  name: audit-service
+  annotations: {}
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: serviceaccount
+
+# RBAC configuration
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["networking.k8s.io"]
+      resources: ["ingresses"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["autoscaling"]
+      resources: ["horizontalpodautoscalers"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+    port: metrics
+  
+  prometheusRule:
+    enabled: true
+    groups:
+      - name: audit-service.rules
+        rules:
+          - alert: AuditServiceHighErrorRate
+            expr: rate(audit_service_errors_total[5m]) > 0.1
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High error rate detected in audit service"
+              description: "Error rate is {{ $value }} errors per second"
+
+# Security configuration
+security:
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    capabilities:
+      drop:
+        - ALL
+
+# Affinity and anti-affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - audit-service
+          topologyKey: kubernetes.io/hostname
+
+# Tolerations
+tolerations: []
+
+# Node selector
+nodeSelector: {}
+
+# Annotations
+annotations: {}
+
+# Labels
+labels:
+  app.kubernetes.io/name: audit-service
+  app.kubernetes.io/instance: "{{ .Release.Name }}"
+  app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
+  app.kubernetes.io/managed-by: "{{ .Release.Service }}"
+
+# Secrets configuration
+# These should be provided via external secret management or CI/CD
+secrets:
+  databaseUrl: "postgresql://user:password@host:5432/database"
+  jwtSecretKey: "your-jwt-secret-key-here"
+  redisUrl: "redis://redis-host:6379/0"
+  natsUrl: "nats://nats-host:4222"
+  googleCredentials: "{}"
+  apiKeySecret: "your-api-key-secret-here"
+  encryptionKey: "your-encryption-key-here"

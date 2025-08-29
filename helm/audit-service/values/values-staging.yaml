@@ -1,0 +1,92 @@
+# Staging environment values
+global:
+  environment: staging
+
+image:
+  tag: staging
+  frontend:
+    tag: staging
+
+app:
+  replicas:
+    backend: 2
+    frontend: 2
+    worker: 2
+
+namespace:
+  name: audit-service-staging
+
+backend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    ENVIRONMENT: "staging"
+    LOG_LEVEL: "INFO"
+    DATABASE_TYPE: "bigquery"
+    BIGQUERY_DATASET: "audit_logs_staging"
+    BIGQUERY_TABLE: "audit_events_staging"
+
+frontend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+hpa:
+  backend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+  frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+ingress:
+  enabled: true
+  hosts:
+    - host: audit-staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: audit-service-frontend
+            port: 80
+        - path: /api
+          pathType: Prefix
+          service:
+            name: audit-service-backend
+            port: 8000
+
+resources:
+  quota:
+    enabled: true
+    cpu:
+      requests: "2"
+      limits: "4"
+    memory:
+      requests: 4Gi
+      limits: 8Gi
+
+monitoring:
+  enabled: true

@@ -206,7 +206,9 @@ For detailed testing information, see [tests/README.md](tests/README.md).
 
 ## 📦 Deployment
 
-### Production Build
+### Docker Compose (Local/Development)
+
+#### Production Build
 ```bash
 # Build production images
 docker-compose build
@@ -215,12 +217,212 @@ docker-compose build
 docker-compose up -d
 ```
 
-### Docker Images
+#### Docker Images
 - Frontend: Nginx serving built React app
 - Backend: Python FastAPI application
 - Database: PostgreSQL with audit log partitioning
 - Cache: Redis for session and data caching
 - Message Broker: NATS for event streaming
+
+### Helm Chart (Production/Kubernetes)
+
+The Audit Service includes a comprehensive Helm chart for Kubernetes deployment with automated CI/CD integration.
+
+#### Quick Start with Helm
+
+```bash
+# Test the chart locally
+python3 scripts/test-helm-chart.py
+
+# Install in development
+helm install audit-service-dev ./helm/audit-service \
+  --namespace audit-service-dev \
+  --create-namespace \
+  -f helm/audit-service/values/values-dev.yaml
+
+# Install in staging
+helm install audit-service-staging ./helm/audit-service \
+  --namespace audit-service-staging \
+  --create-namespace \
+  -f helm/audit-service/values/values-staging.yaml
+
+# Install in production
+helm install audit-service ./helm/audit-service \
+  --namespace audit-service \
+  --create-namespace \
+  -f helm/audit-service/values/values-prod.yaml
+```
+
+#### Helm Chart Features
+
+- **🔧 Configuration Management**: Centralized configuration with environment-specific overrides
+- **🚀 Deployment Features**: Rolling updates, health checks, resource quotas
+- **🔒 Security**: Non-root containers, RBAC, security contexts
+- **📊 Monitoring**: Prometheus metrics, Grafana dashboards, custom alerts
+- **🔄 CI/CD Integration**: Automated packaging, versioning, and publishing
+
+#### Chart Structure
+```
+helm/audit-service/
+├── Chart.yaml                 # Chart metadata
+├── values.yaml               # Default values
+├── README.md                 # Chart documentation
+├── templates/                # Kubernetes templates
+│   ├── _helpers.tpl         # Template helpers
+│   ├── namespace.yaml       # Namespace, quotas, limits
+│   ├── backend-deployment.yaml
+│   ├── frontend-deployment.yaml
+│   ├── worker-deployment.yaml
+│   ├── services.yaml        # Backend and frontend services
+│   ├── ingress.yaml         # Ingress configuration
+│   ├── hpa.yaml            # Horizontal Pod Autoscalers
+│   ├── rbac.yaml           # ServiceAccount, Role, RoleBinding
+│   ├── configmap.yaml      # Application configuration
+│   └── secret.yaml         # Sensitive data
+└── values/                  # Environment-specific values
+    ├── values-dev.yaml
+    ├── values-staging.yaml
+    └── values-prod.yaml
+```
+
+#### Key Configuration Options
+
+##### Image Configuration
+```yaml
+image:
+  repository: gcr.io/PROJECT_ID/audit-service
+  tag: latest
+  pullPolicy: Always
+  frontend:
+    repository: gcr.io/PROJECT_ID/audit-service-frontend
+    tag: latest
+```
+
+##### Replica Configuration
+```yaml
+app:
+  replicas:
+    backend: 3
+    frontend: 2
+    worker: 2
+```
+
+##### Resource Limits
+```yaml
+backend:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+```
+
+##### Ingress Configuration
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: audit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: audit-service-frontend
+            port: 80
+        - path: /api
+          pathType: Prefix
+          service:
+            name: audit-service-backend
+            port: 8000
+```
+
+#### CI/CD Integration
+
+The Helm chart is automatically packaged and published through the CI/CD pipeline:
+
+- **Automated Packaging**: Every commit triggers chart packaging
+- **Intelligent Versioning**: Version bumps based on change types
+- **OCI Publishing**: Charts published to GitHub Packages and Google Container Registry
+- **Helm Deployments**: Automated deployments to staging and production
+
+#### Environment-Specific Values
+
+##### Development (`values-dev.yaml`)
+- Single replica deployments
+- Debug logging enabled
+- Resource limits relaxed
+- Monitoring disabled
+- No ingress (port-forward access)
+
+##### Staging (`values-staging.yaml`)
+- 2 replicas per service
+- Production-like configuration
+- Monitoring enabled
+- Ingress with staging hostname
+- Resource quotas enabled
+
+##### Production (`values-prod.yaml`)
+- 3+ replicas per service
+- Full production configuration
+- Comprehensive monitoring
+- Production ingress with SSL
+- Strict resource quotas
+
+#### Deployment Commands
+
+##### Install New Deployment
+```bash
+helm install <release-name> ./helm/audit-service-*.tgz \
+  --namespace <namespace> \
+  --create-namespace \
+  -f values/values-<env>.yaml \
+  --set image.tag=<commit-sha>
+```
+
+##### Upgrade Existing Deployment
+```bash
+helm upgrade <release-name> ./helm/audit-service-*.tgz \
+  --namespace <namespace> \
+  -f values/values-<env>.yaml \
+  --set image.tag=<commit-sha> \
+  --wait --timeout=10m
+```
+
+##### Rollback Deployment
+```bash
+helm rollback <release-name> <revision> --namespace <namespace>
+```
+
+##### Uninstall Deployment
+```bash
+helm uninstall <release-name> --namespace <namespace>
+kubectl delete namespace <namespace>
+```
+
+#### Monitoring & Observability
+
+##### Prometheus Metrics
+- HTTP request metrics
+- Database connection metrics
+- Application-specific metrics
+- Custom business metrics
+
+##### Grafana Dashboards
+- Application performance dashboards
+- Infrastructure metrics
+- Business metrics
+- Custom visualizations
+
+##### Alerts
+- High error rates
+- Service availability
+- Resource utilization
+- Custom business alerts
+
+For detailed Helm chart documentation, see [helm/audit-service/README.md](helm/audit-service/README.md) and [docs/helm-chart-migration.md](docs/helm-chart-migration.md).
 
 ## 🔍 Monitoring
 

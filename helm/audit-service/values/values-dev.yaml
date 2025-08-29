@@ -1,0 +1,71 @@
+# Development environment values
+global:
+  environment: development
+
+image:
+  tag: dev
+  frontend:
+    tag: dev
+
+app:
+  replicas:
+    backend: 1
+    frontend: 1
+    worker: 1
+
+namespace:
+  name: audit-service-dev
+
+backend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    ENVIRONMENT: "development"
+    LOG_LEVEL: "DEBUG"
+    DATABASE_TYPE: "postgresql"
+    BIGQUERY_DATASET: "audit_logs_dev"
+    BIGQUERY_TABLE: "audit_events_dev"
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+hpa:
+  backend:
+    enabled: false
+  frontend:
+    enabled: false
+
+ingress:
+  enabled: false
+
+resources:
+  quota:
+    enabled: false
+  limits:
+    enabled: false
+
+monitoring:
+  enabled: false

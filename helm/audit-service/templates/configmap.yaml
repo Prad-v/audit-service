@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "audit-service.configmapName" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+data:
+  # Application Configuration
+  ENVIRONMENT: {{ .Values.backend.env.ENVIRONMENT | quote }}
+  LOG_LEVEL: {{ .Values.backend.env.LOG_LEVEL | quote }}
+  API_V1_STR: {{ .Values.backend.env.API_V1_STR | quote }}
+  PROJECT_NAME: {{ .Values.backend.env.PROJECT_NAME | quote }}
+  
+  # Database Configuration
+  DATABASE_TYPE: {{ .Values.backend.env.DATABASE_TYPE | quote }}
+  DATABASE_POOL_SIZE: {{ .Values.backend.env.DATABASE_POOL_SIZE | quote }}
+  DATABASE_MAX_OVERFLOW: {{ .Values.backend.env.DATABASE_MAX_OVERFLOW | quote }}
+  DATABASE_POOL_TIMEOUT: {{ .Values.backend.env.DATABASE_POOL_TIMEOUT | quote }}
+  DATABASE_POOL_RECYCLE: {{ .Values.backend.env.DATABASE_POOL_RECYCLE | quote }}
+  
+  # BigQuery Configuration
+  BIGQUERY_DATASET: {{ .Values.backend.env.BIGQUERY_DATASET | quote }}
+  BIGQUERY_TABLE: {{ .Values.backend.env.BIGQUERY_TABLE | quote }}
+  BIGQUERY_LOCATION: {{ .Values.backend.env.BIGQUERY_LOCATION | quote }}
+  
+  # Pub/Sub Configuration
+  USE_PUBSUB: {{ .Values.backend.env.USE_PUBSUB | quote }}
+  PUBSUB_TOPIC_NAME: {{ .Values.backend.env.PUBSUB_TOPIC_NAME | quote }}
+  PUBSUB_SUBSCRIPTION_NAME: {{ .Values.backend.env.PUBSUB_SUBSCRIPTION_NAME | quote }}
+  PUBSUB_MAX_MESSAGES: {{ .Values.backend.env.PUBSUB_MAX_MESSAGES | quote }}
+  PUBSUB_ACK_DEADLINE: {{ .Values.backend.env.PUBSUB_ACK_DEADLINE | quote }}
+  PUBSUB_RETENTION: {{ .Values.backend.env.PUBSUB_RETENTION | quote }}
+  PUBSUB_ORDERING: {{ .Values.backend.env.PUBSUB_ORDERING | quote }}
+  PUBSUB_EXACTLY_ONCE: {{ .Values.backend.env.PUBSUB_EXACTLY_ONCE | quote }}
+  
+  # Redis Configuration
+  REDIS_HOST: {{ .Values.backend.env.REDIS_HOST | quote }}
+  REDIS_PORT: {{ .Values.backend.env.REDIS_PORT | quote }}
+  REDIS_DB: {{ .Values.backend.env.REDIS_DB | quote }}
+  REDIS_MAX_CONNECTIONS: {{ .Values.backend.env.REDIS_MAX_CONNECTIONS | quote }}
+  REDIS_RETRY_ON_TIMEOUT: {{ .Values.backend.env.REDIS_RETRY_ON_TIMEOUT | quote }}
+  REDIS_SOCKET_KEEPALIVE: {{ .Values.backend.env.REDIS_SOCKET_KEEPALIVE | quote }}
+  REDIS_SOCKET_KEEPALIVE_OPTIONS: {{ .Values.backend.env.REDIS_SOCKET_KEEPALIVE_OPTIONS | quote }}
+  
+  # Cache Configuration
+  CACHE_TTL: {{ .Values.backend.env.CACHE_TTL | quote }}
+  CACHE_MAX_SIZE: {{ .Values.backend.env.CACHE_MAX_SIZE | quote }}
+  CACHE_ENABLED: {{ .Values.backend.env.CACHE_ENABLED | quote }}
+  
+  # Security Configuration
+  JWT_ALGORITHM: {{ .Values.backend.env.JWT_ALGORITHM | quote }}
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.backend.env.JWT_ACCESS_TOKEN_EXPIRE_MINUTES | quote }}
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: {{ .Values.backend.env.JWT_REFRESH_TOKEN_EXPIRE_DAYS | quote }}
+  API_KEY_EXPIRE_DAYS: {{ .Values.backend.env.API_KEY_EXPIRE_DAYS | quote }}
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: {{ .Values.backend.env.RATE_LIMIT_ENABLED | quote }}
+  RATE_LIMIT_REQUESTS: {{ .Values.backend.env.RATE_LIMIT_REQUESTS | quote }}
+  RATE_LIMIT_WINDOW: {{ .Values.backend.env.RATE_LIMIT_WINDOW | quote }}
+  
+  # Monitoring Configuration
+  METRICS_ENABLED: {{ .Values.backend.env.METRICS_ENABLED | quote }}
+  METRICS_PORT: {{ .Values.backend.env.METRICS_PORT | quote }}
+  HEALTH_CHECK_INTERVAL: {{ .Values.backend.env.HEALTH_CHECK_INTERVAL | quote }}
+  
+  # Worker Configuration
+  WORKER_CONCURRENCY: {{ .Values.backend.env.WORKER_CONCURRENCY | quote }}
+  WORKER_MAX_RETRIES: {{ .Values.backend.env.WORKER_MAX_RETRIES | quote }}
+  WORKER_RETRY_DELAY: {{ .Values.backend.env.WORKER_RETRY_DELAY | quote }}
+  BATCH_SIZE: {{ .Values.backend.env.BATCH_SIZE | quote }}
+  BATCH_TIMEOUT: {{ .Values.backend.env.BATCH_TIMEOUT | quote }}
+  
+  # CORS Configuration
+  CORS_ORIGINS: {{ .Values.backend.env.CORS_ORIGINS | quote }}
+  CORS_CREDENTIALS: {{ .Values.backend.env.CORS_CREDENTIALS | quote }}
+  CORS_METHODS: {{ .Values.backend.env.CORS_METHODS | quote }}
+  CORS_HEADERS: {{ .Values.backend.env.CORS_HEADERS | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "audit-service.fullname" . }}-nginx-config
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    upstream backend {
+        server {{ include "audit-service.backend.serviceName" . }}:{{ .Values.backend.ports.http }};
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Referrer-Policy "strict-origin-when-cross-origin";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';";
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=frontend:10m rate=30r/s;
+        
+        # Frontend routes
+        location / {
+            limit_req zone=frontend burst=20 nodelay;
+            try_files $uri $uri/ /index.html;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # API routes
+        location /api/ {
+            limit_req zone=api burst=10 nodelay;
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+        
+        # Health check
+        location /health/ {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Metrics endpoint
+        location /metrics {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Documentation
+        location /docs {
+            alias /usr/share/nginx/docs;
+            try_files $uri $uri/ /docs/index.html;
+            expires 1h;
+            add_header Cache-Control "public";
+        }
+        
+        # Static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            try_files $uri =404;
+        }
+    }

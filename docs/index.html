@@ -80,6 +80,9 @@
                     <a href="#deployment" class="block px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md transition-colors">
                         <i class="fas fa-server mr-2"></i>Deployment
                     </a>
+                    <a href="#helm-chart" class="block px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md transition-colors">
+                        <i class="fas fa-chart-line mr-2"></i>Helm Chart
+                    </a>
                     <a href="#testing" class="block px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md transition-colors">
                         <i class="fas fa-vial mr-2"></i>Testing
                     </a>
@@ -332,13 +335,239 @@ console.log(`Event created: ${result.audit_id}`);</code></pre>
                     <h2 class="text-3xl font-bold text-gray-900 mb-6">Deployment</h2>
                     
                     <div class="bg-white rounded-lg shadow-md p-6">
-                        <h3 class="text-xl font-semibold mb-4">Docker Compose</h3>
+                        <h3 class="text-xl font-semibold mb-4">Docker Compose (Local/Development)</h3>
                         <div class="code-block">
                             <pre><code># Production deployment
 docker-compose up -d
 
 # Development deployment
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Helm Chart (Production/Kubernetes)</h3>
+                        <p class="text-gray-600 mb-4">The Audit Service includes a comprehensive Helm chart for Kubernetes deployment with automated CI/CD integration.</p>
+                        
+                        <h4 class="text-lg font-semibold mb-3">Quick Start</h4>
+                        <div class="code-block">
+                            <pre><code># Test the chart locally
+python3 scripts/test-helm-chart.py
+
+# Install in development
+helm install audit-service-dev ./helm/audit-service \
+  --namespace audit-service-dev \
+  --create-namespace \
+  -f helm/audit-service/values/values-dev.yaml
+
+# Install in staging
+helm install audit-service-staging ./helm/audit-service \
+  --namespace audit-service-staging \
+  --create-namespace \
+  -f helm/audit-service/values/values-staging.yaml
+
+# Install in production
+helm install audit-service ./helm/audit-service \
+  --namespace audit-service \
+  --create-namespace \
+  -f helm/audit-service/values/values-prod.yaml</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Helm Chart Features</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-blue-900">🔧 Configuration Management</h4>
+                                <p class="text-blue-700 text-sm">Centralized configuration with environment-specific overrides</p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-green-900">🚀 Deployment Features</h4>
+                                <p class="text-green-700 text-sm">Rolling updates, health checks, resource quotas</p>
+                            </div>
+                            <div class="bg-red-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-red-900">🔒 Security</h4>
+                                <p class="text-red-700 text-sm">Non-root containers, RBAC, security contexts</p>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-purple-900">📊 Monitoring</h4>
+                                <p class="text-purple-700 text-sm">Prometheus metrics, Grafana dashboards, custom alerts</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Key Configuration Options</h3>
+                        
+                        <h4 class="text-lg font-semibold mb-3">Image Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>image:
+  repository: gcr.io/PROJECT_ID/audit-service
+  tag: latest
+  pullPolicy: Always
+  frontend:
+    repository: gcr.io/PROJECT_ID/audit-service-frontend
+    tag: latest</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Replica Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>app:
+  replicas:
+    backend: 3
+    frontend: 2
+    worker: 2</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Resource Limits</h4>
+                        <div class="code-block">
+                            <pre><code>backend:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Ingress Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: audit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: audit-service-frontend
+            port: 80
+        - path: /api
+          pathType: Prefix
+          service:
+            name: audit-service-backend
+            port: 8000</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Environment-Specific Values</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-blue-600">Development</h4>
+                                <p class="text-sm text-gray-600 mb-2">values-dev.yaml</p>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li>• Single replica deployments</li>
+                                    <li>• Debug logging enabled</li>
+                                    <li>• Resource limits relaxed</li>
+                                    <li>• Monitoring disabled</li>
+                                    <li>• No ingress (port-forward access)</li>
+                                </ul>
+                            </div>
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-orange-600">Staging</h4>
+                                <p class="text-sm text-gray-600 mb-2">values-staging.yaml</p>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li>• 2 replicas per service</li>
+                                    <li>• Production-like configuration</li>
+                                    <li>• Monitoring enabled</li>
+                                    <li>• Ingress with staging hostname</li>
+                                    <li>• Resource quotas enabled</li>
+                                </ul>
+                            </div>
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-green-600">Production</h4>
+                                <p class="text-sm text-gray-600 mb-2">values-prod.yaml</p>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li>• 3+ replicas per service</li>
+                                    <li>• Full production configuration</li>
+                                    <li>• Comprehensive monitoring</li>
+                                    <li>• Production ingress with SSL</li>
+                                    <li>• Strict resource quotas</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Deployment Commands</h3>
+                        
+                        <h4 class="text-lg font-semibold mb-3">Install New Deployment</h4>
+                        <div class="code-block">
+                            <pre><code>helm install &lt;release-name&gt; ./helm/audit-service-*.tgz \
+  --namespace &lt;namespace&gt; \
+  --create-namespace \
+  -f values/values-&lt;env&gt;.yaml \
+  --set image.tag=&lt;commit-sha&gt;</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Upgrade Existing Deployment</h4>
+                        <div class="code-block">
+                            <pre><code>helm upgrade &lt;release-name&gt; ./helm/audit-service-*.tgz \
+  --namespace &lt;namespace&gt; \
+  -f values/values-&lt;env&gt;.yaml \
+  --set image.tag=&lt;commit-sha&gt; \
+  --wait --timeout=10m</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Rollback Deployment</h4>
+                        <div class="code-block">
+                            <pre><code>helm rollback &lt;release-name&gt; &lt;revision&gt; --namespace &lt;namespace&gt;</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Uninstall Deployment</h4>
+                        <div class="code-block">
+                            <pre><code>helm uninstall &lt;release-name&gt; --namespace &lt;namespace&gt;
+kubectl delete namespace &lt;namespace&gt;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">CI/CD Integration</h3>
+                        <p class="text-gray-600 mb-4">The Helm chart is automatically packaged and published through the CI/CD pipeline:</p>
+                        
+                        <ul class="list-disc list-inside space-y-2 text-gray-600">
+                            <li><strong>Automated Packaging:</strong> Every commit triggers chart packaging</li>
+                            <li><strong>Intelligent Versioning:</strong> Version bumps based on change types</li>
+                            <li><strong>OCI Publishing:</strong> Charts published to GitHub Packages and Google Container Registry</li>
+                            <li><strong>Helm Deployments:</strong> Automated deployments to staging and production</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Monitoring & Observability</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-blue-600">Prometheus Metrics</h4>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li>• HTTP request metrics</li>
+                                    <li>• Database connection metrics</li>
+                                    <li>• Application-specific metrics</li>
+                                    <li>• Custom business metrics</li>
+                                </ul>
+                            </div>
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-purple-600">Grafana Dashboards</h4>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li>• Application performance dashboards</li>
+                                    <li>• Infrastructure metrics</li>
+                                    <li>• Business metrics</li>
+                                    <li>• Custom visualizations</li>
+                                </ul>
+                            </div>
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-red-600">Alerts</h4>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    <li>• High error rates</li>
+                                    <li>• Service availability</li>
+                                    <li>• Resource utilization</li>
+                                    <li>• Custom business alerts</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
 
@@ -350,6 +579,311 @@ REDIS_URL=redis://localhost:6379/0
 NATS_URL=nats://localhost:4222
 RBAC_AUTHENTICATION_DISABLED=false
 RBAC_AUTHORIZATION_DISABLED=false</code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Helm Chart -->
+                <section id="helm-chart" class="mb-12">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-6">Helm Chart Details</h2>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Chart Structure</h3>
+                        <div class="code-block">
+                            <pre><code>helm/audit-service/
+├── Chart.yaml                 # Chart metadata
+├── values.yaml               # Default values
+├── README.md                 # Chart documentation
+├── templates/                # Kubernetes templates
+│   ├── _helpers.tpl         # Template helpers
+│   ├── namespace.yaml       # Namespace, quotas, limits
+│   ├── backend-deployment.yaml
+│   ├── frontend-deployment.yaml
+│   ├── worker-deployment.yaml
+│   ├── services.yaml        # Backend and frontend services
+│   ├── ingress.yaml         # Ingress configuration
+│   ├── hpa.yaml            # Horizontal Pod Autoscalers
+│   ├── rbac.yaml           # ServiceAccount, Role, RoleBinding
+│   ├── configmap.yaml      # Application configuration
+│   └── secret.yaml         # Sensitive data
+└── values/                  # Environment-specific values
+    ├── values-dev.yaml
+    ├── values-staging.yaml
+    └── values-prod.yaml</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Values Configuration</h3>
+                        
+                        <h4 class="text-lg font-semibold mb-3">Global Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>global:
+  environment: production
+  imageRegistry: gcr.io
+  imagePullSecrets:
+    - name: audit-service-registry
+
+app:
+  name: audit-service
+  version: "1.0.0"
+  replicas:
+    backend: 3
+    frontend: 2
+    worker: 2</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Backend Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>backend:
+  enabled: true
+  image:
+    repository: gcr.io/PROJECT_ID/audit-service-backend
+    tag: latest
+    pullPolicy: Always
+  
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  ports:
+    http: 8000
+    metrics: 8000</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Frontend Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>frontend:
+  enabled: true
+  image:
+    repository: gcr.io/PROJECT_ID/audit-service-frontend
+    tag: latest
+    pullPolicy: Always
+  
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  ports:
+    http: 80</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Worker Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>worker:
+  enabled: true
+  image:
+    repository: gcr.io/PROJECT_ID/audit-service-backend
+    tag: latest
+    pullPolicy: Always
+  
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  command: ["python", "-m", "app.worker"]</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Service Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>service:
+  backend:
+    enabled: true
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    annotations: {}
+  
+  frontend:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+    annotations: {}</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Ingress Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  
+  hosts:
+    - host: audit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: audit-service-frontend
+            port: 80
+        - path: /api
+          pathType: Prefix
+          service:
+            name: audit-service-backend
+            port: 8000</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">HPA Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>hpa:
+  backend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">RBAC Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>serviceAccount:
+  create: true
+  name: audit-service
+  annotations: {}
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: serviceaccount
+
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Monitoring Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+    port: metrics
+  
+  prometheusRule:
+    enabled: true
+    groups:
+      - name: audit-service.rules
+        rules:
+          - alert: AuditServiceHighErrorRate
+            expr: rate(audit_service_errors_total[5m]) > 0.1
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High error rate detected in audit service"</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Security Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>security:
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    capabilities:
+      drop:
+        - ALL</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Secrets Configuration</h4>
+                        <div class="code-block">
+                            <pre><code>secrets:
+  databaseUrl: "postgresql://user:password@host:5432/database"
+  jwtSecretKey: "your-jwt-secret-key-here"
+  redisUrl: "redis://redis-host:6379/0"
+  natsUrl: "nats://nats-host:4222"
+  googleCredentials: "{}"
+  apiKeySecret: "your-api-key-secret-here"
+  encryptionKey: "your-encryption-key-here"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Testing & Validation</h3>
+                        
+                        <h4 class="text-lg font-semibold mb-3">Local Testing</h4>
+                        <div class="code-block">
+                            <pre><code># Run comprehensive chart tests
+python3 scripts/test-helm-chart.py
+
+# Test with specific values
+helm template test-release ./helm/audit-service \
+  --values helm/audit-service/values/values-prod.yaml \
+  --namespace audit-service > /tmp/rendered.yaml
+
+# Validate rendered templates
+kubectl apply --dry-run=client -f /tmp/rendered.yaml</code></pre>
+                        </div>
+
+                        <h4 class="text-lg font-semibold mb-3 mt-6">Chart Validation</h4>
+                        <div class="code-block">
+                            <pre><code># Lint the chart
+helm lint ./helm/audit-service
+
+# Package the chart
+helm package ./helm/audit-service
+
+# Install with dry-run
+helm install --dry-run --debug test-release ./helm/audit-service</code></pre>
                         </div>
                     </div>
                 </section>

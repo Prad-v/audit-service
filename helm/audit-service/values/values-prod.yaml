@@ -1,0 +1,92 @@
+# Production environment values
+global:
+  environment: production
+
+image:
+  tag: latest
+  frontend:
+    tag: latest
+
+app:
+  replicas:
+    backend: 3
+    frontend: 2
+    worker: 2
+
+namespace:
+  name: audit-service
+
+backend:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"
+    DATABASE_TYPE: "bigquery"
+    BIGQUERY_DATASET: "audit_logs"
+    BIGQUERY_TABLE: "audit_events"
+
+frontend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+hpa:
+  backend:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+  frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+
+ingress:
+  enabled: true
+  hosts:
+    - host: audit.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: audit-service-frontend
+            port: 80
+        - path: /api
+          pathType: Prefix
+          service:
+            name: audit-service-backend
+            port: 8000
+
+resources:
+  quota:
+    enabled: true
+    cpu:
+      requests: "4"
+      limits: "8"
+    memory:
+      requests: 8Gi
+      limits: 16Gi
+
+monitoring:
+  enabled: true

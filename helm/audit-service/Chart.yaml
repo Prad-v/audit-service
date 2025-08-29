@@ -1,0 +1,23 @@
+apiVersion: v2
+name: audit-service
+description: A comprehensive audit logging service with real-time monitoring and analytics
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - audit
+  - logging
+  - monitoring
+  - analytics
+  - security
+home: https://github.com/your-org/audit-service
+sources:
+  - https://github.com/your-org/audit-service
+maintainers:
+  - name: Audit Service Team
+    email: audit-service@example.com
+icon: https://img.icons8.com/color/96/000000/audit.png
+annotations:
+  category: Infrastructure
+  licenses: MIT
+  vendor: Audit Service Team

@@ -1,0 +1,49 @@
+{{- if .Values.service.backend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "audit-service.backend.serviceName" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.backend.labels" . | nindent 4 }}
+  {{- with .Values.service.backend.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.backend.type }}
+  ports:
+  - port: {{ .Values.service.backend.port }}
+    targetPort: {{ .Values.service.backend.targetPort }}
+    protocol: TCP
+    name: http
+  - port: {{ .Values.backend.ports.metrics }}
+    targetPort: {{ .Values.backend.ports.metrics }}
+    protocol: TCP
+    name: metrics
+  selector:
+    {{- include "audit-service.backend.selectorLabels" . | nindent 4 }}
+---
+{{- end }}
+{{- if .Values.service.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "audit-service.frontend.serviceName" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.frontend.labels" . | nindent 4 }}
+  {{- with .Values.service.frontend.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.frontend.type }}
+  ports:
+  - port: {{ .Values.service.frontend.port }}
+    targetPort: {{ .Values.service.frontend.targetPort }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "audit-service.frontend.selectorLabels" . | nindent 4 }}
+{{- end }}
