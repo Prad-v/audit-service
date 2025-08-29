@@ -67,6 +67,34 @@ class AlertPolicy(Base, TimestampMixin):
     )
 
 
+class AlertRule(Base, TimestampMixin):
+    """Alert rule table"""
+    __tablename__ = "alert_rules"
+    
+    rule_id = Column(String(255), primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Rule configuration
+    field = Column(String(255), nullable=False, index=True)
+    operator = Column(String(50), nullable=False)
+    value = Column(Text, nullable=False)  # Store as text, can be parsed as needed
+    case_sensitive = Column(Boolean, nullable=False, default=True)
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    
+    # Metadata
+    tenant_id = Column(String(255), nullable=False, index=True)
+    created_by = Column(String(255), nullable=False, index=True)
+    
+    __table_args__ = (
+        CheckConstraint("operator IN ('eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'not_in', 'contains', 'regex')", 
+                       name='ck_alert_rules_operator'),
+        Index('idx_alert_rules_tenant_enabled', 'tenant_id', 'enabled'),
+        Index('idx_alert_rules_field', 'field'),
+        Index('idx_alert_rules_created_by', 'created_by'),
+    )
+
+
 class AlertProvider(Base, TimestampMixin):
     """Alert provider table"""
     __tablename__ = "alert_providers"

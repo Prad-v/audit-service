@@ -36,6 +36,18 @@ interface AlertPolicy {
   updated_at: string
 }
 
+interface AlertProvider {
+  provider_id: string
+  name: string
+  provider_type: 'pagerduty' | 'slack' | 'webhook' | 'email'
+  enabled: boolean
+  config: Record<string, any>
+  tenant_id: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 interface AlertPolicyCreate {
   name: string
   description?: string
@@ -53,10 +65,10 @@ interface AlertPolicyCreate {
 
 export function AlertPolicies() {
   const [policies, setPolicies] = useState<AlertPolicy[]>([])
+  const [providers, setProviders] = useState<AlertProvider[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  // TODO: Implement edit functionality
-  // const [editingPolicy, setEditingPolicy] = useState<AlertPolicy | null>(null)
+  const [editingPolicy, setEditingPolicy] = useState<AlertPolicy | null>(null)
   const [formData, setFormData] = useState<AlertPolicyCreate>({
     name: '',
     description: '',
@@ -73,6 +85,7 @@ export function AlertPolicies() {
 
   useEffect(() => {
     fetchPolicies()
+    fetchProviders()
   }, [])
 
   const fetchPolicies = async () => {
@@ -93,6 +106,22 @@ export function AlertPolicies() {
     }
   }
 
+  const fetchProviders = async () => {
+    try {
+      const response = await fetch('/api/v1/alerts/providers', {
+        headers: {
+          'Authorization': 'Bearer test-token'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProviders(data.providers || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch providers:', error)
+    }
+  }
+
   const handleCreatePolicy = async () => {
     try {
       const response = await fetch('/api/v1/alerts/policies', {
@@ -105,24 +134,70 @@ export function AlertPolicies() {
       })
       if (response.ok) {
         setShowCreateModal(false)
-        setFormData({
-          name: '',
-          description: '',
-          enabled: true,
-          rules: [],
-          match_all: true,
-          severity: 'medium',
-          message_template: '',
-          summary_template: '',
-          throttle_minutes: 0,
-          max_alerts_per_hour: 10,
-          providers: []
-        })
+        resetForm()
         fetchPolicies()
       }
     } catch (error) {
       console.error('Failed to create policy:', error)
     }
+  }
+
+  const handleUpdatePolicy = async () => {
+    if (!editingPolicy) return
+    
+    try {
+      const response = await fetch(`/api/v1/alerts/policies/${editingPolicy.policy_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer test-token'
+        },
+        body: JSON.stringify(formData)
+      })
+      if (response.ok) {
+        setShowCreateModal(false)
+        setEditingPolicy(null)
+        resetForm()
+        fetchPolicies()
+      }
+    } catch (error) {
+      console.error('Failed to update policy:', error)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      enabled: true,
+      rules: [],
+      match_all: true,
+      severity: 'medium',
+      message_template: '',
+      summary_template: '',
+      throttle_minutes: 0,
+      max_alerts_per_hour: 10,
+      providers: []
+    })
+  }
+
+  const handleEditPolicy = (policy: AlertPolicy) => {
+    setEditingPolicy(policy)
+    setFormData({
+      name: policy.name,
+      description: policy.description || '',
+      enabled: policy.enabled,
+      rules: policy.rules,
+      match_all: policy.match_all,
+      severity: policy.severity,
+      message_template: policy.message_template,
+      summary_template: policy.summary_template,
+      time_window: policy.time_window,
+      throttle_minutes: policy.throttle_minutes,
+      max_alerts_per_hour: policy.max_alerts_per_hour,
+      providers: policy.providers
+    })
+    setShowCreateModal(true)
   }
 
   const handleDeletePolicy = async (policyId: string) => {
@@ -176,7 +251,11 @@ export function AlertPolicies() {
           <p className="text-gray-600">Manage alert policies and rules</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            setEditingPolicy(null)
+            resetForm()
+            setShowCreateModal(true)
+          }}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -219,9 +298,9 @@ export function AlertPolicies() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => {/* TODO: Implement edit functionality */}}
+                    onClick={() => handleEditPolicy(policy)}
                     className="text-gray-400 hover:text-gray-600"
-                    title="Edit Policy (Coming Soon)"
+                    title="Edit Policy"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
@@ -243,7 +322,11 @@ export function AlertPolicies() {
             <p className="mt-1 text-sm text-gray-500">Get started by creating a new alert policy.</p>
             <div className="mt-6">
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => {
+                  setEditingPolicy(null)
+                  resetForm()
+                  setShowCreateModal(true)
+                }}
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -257,9 +340,11 @@ export function AlertPolicies() {
       {/* Create/Edit Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+          <div className="relative top-10 mx-auto p-5 border w-[600px] max-h-[90vh] overflow-y-auto shadow-lg rounded-md bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Create Alert Policy</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingPolicy ? 'Edit Alert Policy' : 'Create Alert Policy'}
+              </h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Name</label>
@@ -303,6 +388,63 @@ export function AlertPolicies() {
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Summary Template</label>
+                  <input
+                    type="text"
+                    value={formData.summary_template}
+                    onChange={(e) => setFormData({ ...formData, summary_template: e.target.value })}
+                    placeholder="e.g., Alert summary for {user_id}"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Alert Providers</label>
+                  {providers.length > 0 ? (
+                    <>
+                      <select
+                        multiple
+                        value={formData.providers}
+                        onChange={(e) => {
+                          const selectedOptions = Array.from(e.target.selectedOptions, option => option.value)
+                          setFormData({ ...formData, providers: selectedOptions })
+                        }}
+                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        {providers.map(provider => (
+                          <option key={provider.provider_id} value={provider.provider_id}>
+                            {provider.name || 'Unnamed Provider'} ({provider.provider_type})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-sm text-gray-500">Hold Ctrl/Cmd to select multiple providers</p>
+                    </>
+                  ) : (
+                    <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-700">No providers available. Please create providers first.</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Throttle Minutes</label>
+                  <input
+                    type="number"
+                    value={formData.throttle_minutes}
+                    onChange={(e) => setFormData({ ...formData, throttle_minutes: parseInt(e.target.value) || 0 })}
+                    min="0"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Max Alerts Per Hour</label>
+                  <input
+                    type="number"
+                    value={formData.max_alerts_per_hour}
+                    onChange={(e) => setFormData({ ...formData, max_alerts_per_hour: parseInt(e.target.value) || 10 })}
+                    min="1"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -315,16 +457,20 @@ export function AlertPolicies() {
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setEditingPolicy(null)
+                    resetForm()
+                  }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleCreatePolicy}
+                  onClick={editingPolicy ? handleUpdatePolicy : handleCreatePolicy}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700"
                 >
-                  Create
+                  {editingPolicy ? 'Update' : 'Create'}
                 </button>
               </div>
             </div>

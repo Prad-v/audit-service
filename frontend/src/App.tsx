@@ -9,6 +9,7 @@ import LLMProviders from './pages/LLMProviders'
 import { AlertPolicies } from './pages/AlertPolicies'
 import { AlertProviders } from './pages/AlertProviders'
 import { Alerts } from './pages/Alerts'
+import { AlertRules } from './pages/AlertRules'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/alert-policies" element={<AlertPolicies />} />
         <Route path="/alert-providers" element={<AlertProviders />} />
         <Route path="/alerts" element={<Alerts />} />
+        <Route path="/alert-rules" element={<AlertRules />} />
       </Routes>
     </Layout>
   )

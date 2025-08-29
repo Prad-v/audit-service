@@ -12,10 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.schemas import AlertPolicy, AlertProvider, Alert, AlertThrottle, AlertSuppression
+from app.db.schemas import AlertPolicy, AlertProvider, Alert, AlertThrottle, AlertSuppression, AlertRule
 from app.models.alert import (
     AlertPolicyCreate, AlertPolicyUpdate, AlertPolicyResponse, AlertPolicyListResponse,
     AlertProviderCreate, AlertProviderUpdate, AlertProviderResponse, AlertProviderListResponse,
+    AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse, AlertRuleListResponse,
     AlertResponse, AlertListResponse, AlertSeverity, AlertStatus, AlertProviderType
 )
 from app.core.database import get_db
@@ -574,3 +575,231 @@ async def process_event(
     except Exception as e:
         logger.error(f"Error processing event: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing event: {str(e)}")
+
+
+# Alert Rules Endpoints
+@router.post("/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
+async def create_alert_rule(
+    rule_data: AlertRuleCreate,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new alert rule"""
+    try:
+        # Generate rule ID
+        rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
+        
+        # Create rule
+        rule = AlertRule(
+            rule_id=rule_id,
+            name=rule_data.name,
+            description=rule_data.description,
+            field=rule_data.field,
+            operator=rule_data.operator,
+            value=str(rule_data.value),  # Convert to string for storage
+            case_sensitive=rule_data.case_sensitive,
+            enabled=rule_data.enabled,
+            tenant_id="default",  # TODO: Get from user context
+            created_by=current_user
+        )
+        
+        db.add(rule)
+        await db.commit()
+        await db.refresh(rule)
+        
+        # Convert value back to original type for response
+        rule.value = rule_data.value
+        
+        return AlertRuleResponse.from_orm(rule)
+        
+    except Exception as e:
+        logger.error(f"Error creating alert rule: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating alert rule: {str(e)}")
+
+
+@router.get("/rules", response_model=AlertRuleListResponse)
+async def list_alert_rules(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=100),
+    enabled: Optional[bool] = None,
+    field: Optional[str] = None,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """List alert rules"""
+    try:
+        # Build query
+        query = select(AlertRule).where(AlertRule.tenant_id == "default")
+        
+        if enabled is not None:
+            query = query.where(AlertRule.enabled == enabled)
+        if field:
+            query = query.where(AlertRule.field == field)
+        
+        # Get total count
+        count_query = select(func.count(AlertRule.rule_id)).select_from(query.subquery())
+        total = await db.scalar(count_query)
+        
+        # Get paginated results
+        offset = (page - 1) * per_page
+        query = query.offset(offset).limit(per_page)
+        
+        result = await db.execute(query)
+        rules = result.scalars().all()
+        
+        # Convert value back to original type for response
+        for rule in rules:
+            try:
+                # Try to convert back to original type
+                if rule.value.lower() in ('true', 'false'):
+                    rule.value = rule.value.lower() == 'true'
+                elif rule.value.isdigit():
+                    rule.value = int(rule.value)
+                elif rule.value.replace('.', '').isdigit():
+                    rule.value = float(rule.value)
+                else:
+                    rule.value = rule.value
+            except:
+                rule.value = rule.value
+        
+        return AlertRuleListResponse(
+            rules=[AlertRuleResponse.from_orm(rule) for rule in rules],
+            total=total,
+            page=page,
+            per_page=per_page
+        )
+        
+    except Exception as e:
+        logger.error(f"Error listing alert rules: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing alert rules: {str(e)}")
+
+
+@router.get("/rules/{rule_id}", response_model=AlertRuleResponse)
+async def get_alert_rule(
+    rule_id: str,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a specific alert rule"""
+    try:
+        result = await db.execute(
+            select(AlertRule).where(
+                and_(
+                    AlertRule.rule_id == rule_id,
+                    AlertRule.tenant_id == "default"
+                )
+            )
+        )
+        rule = result.scalar_one_or_none()
+        
+        if not rule:
+            raise HTTPException(status_code=404, detail="Alert rule not found")
+        
+        # Convert value back to original type for response
+        try:
+            if rule.value.lower() in ('true', 'false'):
+                rule.value = rule.value.lower() == 'true'
+            elif rule.value.isdigit():
+                rule.value = int(rule.value)
+            elif rule.value.replace('.', '').isdigit():
+                rule.value = float(rule.value)
+            else:
+                rule.value = rule.value
+        except:
+            rule.value = rule.value
+        
+        return AlertRuleResponse.from_orm(rule)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting alert rule: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting alert rule: {str(e)}")
+
+
+@router.put("/rules/{rule_id}", response_model=AlertRuleResponse)
+async def update_alert_rule(
+    rule_id: str,
+    rule_data: AlertRuleUpdate,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update an alert rule"""
+    try:
+        result = await db.execute(
+            select(AlertRule).where(
+                and_(
+                    AlertRule.rule_id == rule_id,
+                    AlertRule.tenant_id == "default"
+                )
+            )
+        )
+        rule = result.scalar_one_or_none()
+        
+        if not rule:
+            raise HTTPException(status_code=404, detail="Alert rule not found")
+        
+        # Update fields
+        update_data = rule_data.dict(exclude_unset=True)
+        if 'value' in update_data:
+            update_data['value'] = str(update_data['value'])
+        
+        for field, value in update_data.items():
+            setattr(rule, field, value)
+        
+        rule.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(rule)
+        
+        # Convert value back to original type for response
+        try:
+            if rule.value.lower() in ('true', 'false'):
+                rule.value = rule.value.lower() == 'true'
+            elif rule.value.isdigit():
+                rule.value = int(rule.value)
+            elif rule.value.replace('.', '').isdigit():
+                rule.value = float(rule.value)
+            else:
+                rule.value = rule.value
+        except:
+            rule.value = rule.value
+        
+        return AlertRuleResponse.from_orm(rule)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating alert rule: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating alert rule: {str(e)}")
+
+
+@router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_alert_rule(
+    rule_id: str,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete an alert rule"""
+    try:
+        result = await db.execute(
+            select(AlertRule).where(
+                and_(
+                    AlertRule.rule_id == rule_id,
+                    AlertRule.tenant_id == "default"
+                )
+            )
+        )
+        rule = result.scalar_one_or_none()
+        
+        if not rule:
+            raise HTTPException(status_code=404, detail="Alert rule not found")
+        
+        await db.delete(rule)
+        await db.commit()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting alert rule: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting alert rule: {str(e)}")

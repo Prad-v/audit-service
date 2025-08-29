@@ -350,6 +350,55 @@ class AlertPolicyListResponse(BaseModel):
     per_page: int
 
 
+class AlertRuleCreate(BaseModel):
+    """Request model for creating alert rule"""
+    name: str
+    description: Optional[str] = None
+    field: str
+    operator: str
+    value: Union[str, int, float, bool, List[Any]]
+    case_sensitive: bool = True
+    enabled: bool = True
+
+
+class AlertRuleUpdate(BaseModel):
+    """Request model for updating alert rule"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    field: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Union[str, int, float, bool, List[Any]]] = None
+    case_sensitive: Optional[bool] = None
+    enabled: Optional[bool] = None
+
+
+class AlertRuleResponse(BaseModel):
+    """Response model for alert rules"""
+    rule_id: str
+    name: str
+    description: Optional[str]
+    field: str
+    operator: str
+    value: Union[str, int, float, bool, List[Any]]
+    case_sensitive: bool
+    enabled: bool
+    tenant_id: str
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AlertRuleListResponse(BaseModel):
+    """Response model for list of alert rules"""
+    rules: List[AlertRuleResponse]
+    total: int
+    page: int
+    per_page: int
+
+
 class AlertProviderListResponse(BaseModel):
     """Response model for list of alert providers"""
     providers: List[AlertProviderResponse]
