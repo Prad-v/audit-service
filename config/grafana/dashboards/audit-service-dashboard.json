@@ -105,7 +105,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  time_bucket('1 minute', timestamp) AS time,\n  COUNT(*) as events\nFROM audit_logs\nWHERE\n  $__timeFilter(timestamp)\nGROUP BY time\nORDER BY time",
+          "rawSql": "SELECT\n  timestamp as time,\n  1 as events\nFROM audit_logs\nWHERE\n  timestamp >= $__timeFrom() AND timestamp <= $__timeTo()\nORDER BY timestamp",
           "refId": "A",
           "sql": {
             "columns": [
@@ -212,7 +212,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  time_bucket('1 minute', timestamp) AS time,\n  COUNT(*) as events\nFROM audit_logs\nWHERE\n  $__timeFilter(timestamp)\n  AND status = 'error'\nGROUP BY time\nORDER BY time",
+          "rawSql": "SELECT\n  timestamp as time,\n  1 as events\nFROM audit_logs\nWHERE\n  timestamp >= $__timeFrom() AND timestamp <= $__timeTo()\n  AND status = 'error'\nORDER BY timestamp",
           "refId": "A",
           "sql": {
             "columns": [
@@ -304,7 +304,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  event_type as metric,\n  COUNT(*) as value\nFROM audit_logs\nWHERE\n  $__timeFilter(timestamp)\nGROUP BY event_type\nORDER BY value DESC\nLIMIT 10",
+          "rawSql": "SELECT\n  event_type as metric,\n  COUNT(*) as value\nFROM audit_logs\nWHERE\n  timestamp >= $__timeFrom() AND timestamp <= $__timeTo()\nGROUP BY event_type\nORDER BY value DESC\nLIMIT 10",
           "refId": "A",
           "sql": {
             "columns": [
@@ -396,7 +396,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  status as metric,\n  COUNT(*) as value\nFROM audit_logs\nWHERE\n  $__timeFilter(timestamp)\nGROUP BY status",
+          "rawSql": "SELECT\n  status as metric,\n  COUNT(*) as value\nFROM audit_logs\nWHERE\n  timestamp >= $__timeFrom() AND timestamp <= $__timeTo()\nGROUP BY status",
           "refId": "A",
           "sql": {
             "columns": [
@@ -479,7 +479,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM audit_logs WHERE $__timeFilter(timestamp)",
+          "rawSql": "SELECT COUNT(*) as value FROM audit_logs WHERE timestamp >= $__timeFrom() AND timestamp <= $__timeTo()",
           "refId": "A",
           "sql": {
             "columns": [
@@ -562,7 +562,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM audit_logs WHERE $__timeFilter(timestamp) AND status = 'error'",
+          "rawSql": "SELECT COUNT(*) as value FROM audit_logs WHERE timestamp >= $__timeFrom() AND timestamp <= $__timeTo() AND status = 'error'",
           "refId": "A",
           "sql": {
             "columns": [
@@ -645,7 +645,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT tenant_id) as value FROM audit_logs WHERE $__timeFilter(timestamp)",
+          "rawSql": "SELECT COUNT(DISTINCT tenant_id) as value FROM audit_logs WHERE timestamp >= $__timeFrom() AND timestamp <= $__timeTo()",
           "refId": "A",
           "sql": {
             "columns": [
@@ -728,7 +728,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT user_id) as value FROM audit_logs WHERE $__timeFilter(timestamp) AND user_id IS NOT NULL",
+          "rawSql": "SELECT COUNT(DISTINCT user_id) as value FROM audit_logs WHERE timestamp >= $__timeFrom() AND timestamp <= $__timeTo() AND user_id IS NOT NULL",
           "refId": "A",
           "sql": {
             "columns": [
