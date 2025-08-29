@@ -20,15 +20,12 @@ from app.core.exceptions import (
     AuthorizationError,
 )
 from app.models.audit import (
-    AuditLogCreate,
-    AuditLogBatchCreate,
-    AuditLogResponse,
-    AuditLogQuery,
-    AuditLogSummary,
-    PaginatedAuditLogs,
-    AuditLogExport,
-    EventType,
-    Severity,
+    AuditEventCreate,
+    AuditEventBatchCreate,
+    AuditEventResponse,
+    AuditEventQuery,
+    AuditEventQueryResponse,
+    PaginatedResponse,
 )
 from app.models.auth import Permission
 from app.models.base import PaginationParams, SortOrder
@@ -44,12 +41,12 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/events", response_model=AuditLogResponse)
+@router.post("/events", response_model=AuditEventResponse)
 @require_permission(Permission.WRITE_AUDIT)
 @limiter.limit("1000/minute")  # High rate limit for audit writes
 async def create_audit_event(
     request: Request,
-    audit_data: AuditLogCreate,
+    audit_data: AuditEventCreate,
 ):
     """
     Create a single audit log event.
@@ -73,7 +70,7 @@ async def create_audit_event(
             audit_data.correlation_id = getattr(request.state, "correlation_id", None)
         
         audit_service = get_audit_service()
-        result = await audit_service.create_audit_log(
+        result = await audit_service.create_audit_event(
             audit_data=audit_data,
             tenant_id=tenant_id,
             user_id=user_id,
@@ -81,9 +78,9 @@ async def create_audit_event(
         
         logger.info(
             "Audit event created via API",
-            audit_id=result.id,
+            audit_id=result.audit_id,
             tenant_id=tenant_id,
-            event_type=audit_data.event_type.value,
+            event_type=audit_data.event_type,
         )
         
         return result
@@ -106,12 +103,12 @@ async def create_audit_event(
         )
 
 
-@router.post("/events/batch", response_model=List[AuditLogResponse])
+@router.post("/events/batch", response_model=List[AuditEventResponse])
 @require_permission(Permission.WRITE_AUDIT)
 @limiter.limit("100/minute")  # Lower rate limit for batch operations
 async def create_audit_events_batch(
     request: Request,
-    batch_data: AuditLogBatchCreate,
+    batch_data: AuditEventBatchCreate,
 ):
     """
     Create multiple audit log events in batch.
@@ -177,7 +174,7 @@ async def create_audit_events_batch(
         )
 
 
-@router.get("/events", response_model=PaginatedAuditLogs)
+@router.get("/events", response_model=AuditEventQueryResponse)
 @require_permission(Permission.READ_AUDIT)
 @limiter.limit("300/minute")  # Rate limit for queries
 async def get_audit_events(
@@ -188,11 +185,11 @@ async def get_audit_events(
     # Filtering parameters
     start_date: Optional[datetime] = Query(None, description="Start date filter"),
     end_date: Optional[datetime] = Query(None, description="End date filter"),
-    event_types: Optional[List[EventType]] = Query(None, description="Event type filters"),
+    event_types: Optional[List[str]] = Query(None, description="Event type filters"),
     resource_types: Optional[List[str]] = Query(None, description="Resource type filters"),
     resource_ids: Optional[List[str]] = Query(None, description="Resource ID filters"),
     actions: Optional[List[str]] = Query(None, description="Action filters"),
-    severities: Optional[List[Severity]] = Query(None, description="Severity filters"),
+    severities: Optional[List[str]] = Query(None, description="Severity filters"),
     user_ids: Optional[List[str]] = Query(None, description="User ID filters"),
     ip_addresses: Optional[List[str]] = Query(None, description="IP address filters"),
     session_ids: Optional[List[str]] = Query(None, description="Session ID filters"),
@@ -214,19 +211,18 @@ async def get_audit_events(
         user_id, tenant_id, _, _ = get_current_user(request)
         
         # Build query parameters
-        query = AuditLogQuery(
-            start_date=start_date,
-            end_date=end_date,
-            event_types=event_types,
-            resource_types=resource_types,
-            resource_ids=resource_ids,
-            actions=actions,
-            severities=severities,
-            user_ids=user_ids,
-            ip_addresses=ip_addresses,
-            session_ids=session_ids,
-            correlation_ids=correlation_ids,
-            search=search,
+        query = AuditEventQuery(
+            start_time=start_date,
+            end_time=end_date,
+            event_type=event_types[0] if event_types else None,
+            resource_type=resource_types[0] if resource_types else None,
+            resource_id=resource_ids[0] if resource_ids else None,
+            action=actions[0] if actions else None,
+            status=severities[0] if severities else None,
+            user_id=user_ids[0] if user_ids else None,
+            ip_address=ip_addresses[0] if ip_addresses else None,
+            session_id=session_ids[0] if session_ids else None,
+            correlation_id=correlation_ids[0] if correlation_ids else None,
             sort_by=sort_by,
             sort_order=sort_order,
         )
@@ -269,7 +265,7 @@ async def get_audit_events(
         )
 
 
-@router.get("/events/{audit_id}", response_model=AuditLogResponse)
+@router.get("/events/{audit_id}", response_model=AuditEventResponse)
 @require_permission(Permission.READ_AUDIT)
 @limiter.limit("500/minute")
 async def get_audit_event(
@@ -320,7 +316,7 @@ async def get_audit_event(
         )
 
 
-@router.get("/events/export", response_model=AuditLogExport)
+@router.get("/events/export", response_model=AuditEventQueryResponse)
 @require_permission(Permission.EXPORT_AUDIT)
 @limiter.limit("10/minute")  # Low rate limit for exports
 async def export_audit_events(
@@ -330,11 +326,11 @@ async def export_audit_events(
     # Filtering parameters (same as query)
     start_date: Optional[datetime] = Query(None, description="Start date filter"),
     end_date: Optional[datetime] = Query(None, description="End date filter"),
-    event_types: Optional[List[EventType]] = Query(None, description="Event type filters"),
+    event_types: Optional[List[str]] = Query(None, description="Event type filters"),
     resource_types: Optional[List[str]] = Query(None, description="Resource type filters"),
     resource_ids: Optional[List[str]] = Query(None, description="Resource ID filters"),
     actions: Optional[List[str]] = Query(None, description="Action filters"),
-    severities: Optional[List[Severity]] = Query(None, description="Severity filters"),
+    severities: Optional[List[str]] = Query(None, description="Severity filters"),
     user_ids: Optional[List[str]] = Query(None, description="User ID filters"),
     ip_addresses: Optional[List[str]] = Query(None, description="IP address filters"),
     session_ids: Optional[List[str]] = Query(None, description="Session ID filters"),
@@ -357,19 +353,18 @@ async def export_audit_events(
         user_id, tenant_id, _, _ = get_current_user(request)
         
         # Build query parameters
-        query = AuditLogQuery(
-            start_date=start_date,
-            end_date=end_date,
-            event_types=event_types,
-            resource_types=resource_types,
-            resource_ids=resource_ids,
-            actions=actions,
-            severities=severities,
-            user_ids=user_ids,
-            ip_addresses=ip_addresses,
-            session_ids=session_ids,
-            correlation_ids=correlation_ids,
-            search=search,
+        query = AuditEventQuery(
+            start_time=start_date,
+            end_time=end_date,
+            event_type=event_types[0] if event_types else None,
+            resource_type=resource_types[0] if resource_types else None,
+            resource_id=resource_ids[0] if resource_ids else None,
+            action=actions[0] if actions else None,
+            status=severities[0] if severities else None,
+            user_id=user_ids[0] if user_ids else None,
+            ip_address=ip_addresses[0] if ip_addresses else None,
+            session_id=session_ids[0] if session_ids else None,
+            correlation_id=correlation_ids[0] if correlation_ids else None,
             sort_by=sort_by,
             sort_order=sort_order,
         )
@@ -409,7 +404,7 @@ async def export_audit_events(
         )
 
 
-@router.get("/summary", response_model=AuditLogSummary)
+@router.get("/summary", response_model=AuditEventQueryResponse)
 @require_permission(Permission.READ_AUDIT)
 @limiter.limit("100/minute")
 async def get_audit_summary(
@@ -417,11 +412,11 @@ async def get_audit_summary(
     # Filtering parameters
     start_date: Optional[datetime] = Query(None, description="Start date filter"),
     end_date: Optional[datetime] = Query(None, description="End date filter"),
-    event_types: Optional[List[EventType]] = Query(None, description="Event type filters"),
+    event_types: Optional[List[str]] = Query(None, description="Event type filters"),
     resource_types: Optional[List[str]] = Query(None, description="Resource type filters"),
     resource_ids: Optional[List[str]] = Query(None, description="Resource ID filters"),
     actions: Optional[List[str]] = Query(None, description="Action filters"),
-    severities: Optional[List[Severity]] = Query(None, description="Severity filters"),
+    severities: Optional[List[str]] = Query(None, description="Severity filters"),
     user_ids: Optional[List[str]] = Query(None, description="User ID filters"),
     ip_addresses: Optional[List[str]] = Query(None, description="IP address filters"),
     session_ids: Optional[List[str]] = Query(None, description="Session ID filters"),
@@ -440,19 +435,18 @@ async def get_audit_summary(
         user_id, tenant_id, _, _ = get_current_user(request)
         
         # Build query parameters
-        query = AuditLogQuery(
-            start_date=start_date,
-            end_date=end_date,
-            event_types=event_types,
-            resource_types=resource_types,
-            resource_ids=resource_ids,
-            actions=actions,
-            severities=severities,
-            user_ids=user_ids,
-            ip_addresses=ip_addresses,
-            session_ids=session_ids,
-            correlation_ids=correlation_ids,
-            search=search,
+        query = AuditEventQuery(
+            start_time=start_date,
+            end_time=end_date,
+            event_type=event_types[0] if event_types else None,
+            resource_type=resource_types[0] if resource_types else None,
+            resource_id=resource_ids[0] if resource_ids else None,
+            action=actions[0] if actions else None,
+            status=severities[0] if severities else None,
+            user_id=user_ids[0] if user_ids else None,
+            ip_address=ip_addresses[0] if ip_addresses else None,
+            session_id=session_ids[0] if session_ids else None,
+            correlation_id=correlation_ids[0] if correlation_ids else None,
         )
         
         audit_service = get_audit_service()

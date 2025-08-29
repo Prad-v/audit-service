@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Use development frontend instead of production
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: audit-frontend-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - audit-network
+    restart: unless-stopped
+
+  # Enable hot reload for backend development
+  api:
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - RBAC_AUTHENTICATION_DISABLED=true
+      - RBAC_AUTHORIZATION_DISABLED=true
+
+  # Enable hot reload for worker development
+  worker:
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG

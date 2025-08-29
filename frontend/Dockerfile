@@ -1,37 +1,36 @@
-# Multi-stage build for Backstage frontend
-FROM node:20-alpine as build
+# Build stage
+FROM node:18-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY yarn.lock* ./
+COPY tsconfig*.json ./
+COPY vite.config.ts ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
 
-# Install dependencies
-RUN yarn install --frozen-lockfile
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
-COPY . .
+COPY src ./src
+COPY index.html ./
 
 # Build the application
-RUN yarn build
+RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 
 # Copy built application
-COPY --from=build /app/packages/app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Expose port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+EXPOSE 80
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]

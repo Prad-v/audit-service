@@ -128,25 +128,30 @@ services:
       - audit-network
     restart: unless-stopped
 
-  # Backstage Frontend
+  # React Frontend (Production)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: audit-frontend
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
-      - NODE_ENV=development
-      - BACKEND_URL=http://api:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - NODE_ENV=production
+      - VITE_API_URL=http://localhost:8000
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - audit-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
 
   # # Prometheus Monitoring
   # prometheus:

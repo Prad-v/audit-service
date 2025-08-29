@@ -1,476 +1,273 @@
 # Audit Log Framework
 
-A production-ready, high-performance audit logging system designed to handle 1M+ transactions per day with multi-tenant architecture, real-time processing, and comprehensive observability.
-
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-org/audit-service)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-green)](https://github.com/your-org/audit-service)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11+-blue)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green)](https://fastapi.tiangolo.com)
-
-## 🚀 Features
-
-### Core Capabilities
-- **High Performance**: Handle 1M+ audit events per day with < 100ms response time
-- **Multi-tenant Architecture**: Complete tenant isolation with RBAC
-- **Real-time Processing**: NATS-based message streaming for async operations
-- **Advanced Querying**: Rich filtering, search, and aggregation capabilities
-- **Export Support**: CSV, JSON, and streaming export functionality
-- **Client SDKs**: Python and Go SDKs with async support
-
-### Enterprise Features
-- **Comprehensive Monitoring**: Prometheus metrics, Grafana dashboards, alerting
-- **Structured Logging**: Correlation IDs, centralized logging, log aggregation
-- **Security**: JWT authentication, API keys, rate limiting, audit trails
-- **Scalability**: Horizontal scaling, load balancing, connection pooling
-- **Cloud Ready**: Migration path to GCP BigQuery and Pub/Sub
-- **Developer Portal**: Backstage.io integration with custom plugins
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Load Balancer │───▶│   API Gateway   │───▶│   FastAPI App   │
-│   (nginx/ALB)   │    │  (Rate Limit)   │    │  (Multi-tenant) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                       │
-                                                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Message Queue │◀───│   Background    │───▶│   Database      │
-│   (NATS/Pub/Sub)│    │   Workers       │    │ (PostgreSQL/BQ) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                       │
-                                                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Monitoring    │    │   Cache Layer   │    │   Frontend      │
-│ (Prometheus/    │    │   (Redis)       │    │ (Backstage.io)  │
-│  Grafana)       │    │                 │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Technology Stack
-
-#### Backend
-- **FastAPI**: Modern, fast web framework with automatic API documentation
-- **Python 3.11+**: Latest Python with async/await support
-- **SQLAlchemy**: ORM with async support and connection pooling
-- **PostgreSQL**: Primary database (local) → BigQuery (production)
-- **Redis**: Caching and session storage
-- **NATS**: Message streaming and async processing
-
-#### Frontend
-- **Backstage.io**: Developer portal and service catalog
-- **React**: Component-based UI framework
-- **TypeScript**: Type-safe JavaScript development
-- **Material-UI**: Component library for consistent design
-
-#### Infrastructure
-- **Docker**: Containerization for all services
-- **Docker Compose**: Local development orchestration
-- **Prometheus**: Metrics collection and monitoring
-- **Grafana**: Visualization and dashboards
-- **AlertManager**: Alert routing and notifications
+A comprehensive audit logging system built with FastAPI backend and React frontend, designed for tracking and monitoring application events.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Docker**: 20.10+
-- **Docker Compose**: 2.0+
-- **Python**: 3.11+ (for development)
-- **Node.js**: 18+ (for frontend development)
-- **Git**: 2.30+
+- Docker and Docker Compose
+- Node.js 18+ (for local development)
+- Python 3.11+ (for local development)
 
-### 5-Minute Setup
+### Using Docker (Recommended)
 
-1. **Clone and Setup**
+1. **Start the entire stack:**
+   ```bash
+   ./scripts/start.sh start
+   ```
+
+2. **Start in development mode (with hot reload):**
+   ```bash
+   ./scripts/start.sh dev
+   ```
+
+3. **View logs:**
+   ```bash
+   ./scripts/start.sh logs
+   ```
+
+4. **Stop services:**
+   ```bash
+   ./scripts/start.sh stop
+   ```
+
+### Manual Docker Commands
+
+**Production mode:**
 ```bash
-git clone <repository-url>
-cd audit-service
-cp .env.example .env
+docker-compose up --build -d
 ```
 
-2. **Deploy Everything**
+**Development mode:**
 ```bash
-./scripts/deploy.sh development
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
-3. **Verify Installation**
-```bash
-curl http://localhost:8000/health
-```
+## 📋 Service URLs
 
-4. **Access Services**
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Frontend**: http://localhost:3000
-- **Grafana**: http://localhost:3001 (admin/admin123)
-- **Prometheus**: http://localhost:9090
+Once started, the following services will be available:
 
-### Manual Setup (Development)
+| Service | URL | Description |
+|---------|-----|-------------|
+| Frontend | http://localhost:3000 | React application |
+| API | http://localhost:8000 | FastAPI backend |
+| API Docs | http://localhost:8000/docs | Swagger documentation |
+| Health Check | http://localhost:8000/health | Service health status |
+| PostgreSQL | localhost:5432 | Database |
+| Redis | localhost:6379 | Cache |
+| NATS | localhost:4222 | Message broker |
 
-1. **Start Infrastructure**
-```bash
-docker-compose up -d postgres redis nats
-```
+## 🏗️ Architecture
 
-2. **Setup Backend**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-pip install -r requirements.txt
-python -m alembic upgrade head
-python -m uvicorn app.main:app --reload
-```
+### Frontend (React + Vite)
+- **Technology**: React 18, TypeScript, Vite, Tailwind CSS
+- **Features**: 
+  - Dashboard with statistics
+  - Audit log browsing and filtering
+  - Event creation and management
+  - Responsive design
+  - Real-time updates with React Query
 
-3. **Setup Frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-```
+### Backend (FastAPI)
+- **Technology**: FastAPI, SQLAlchemy, PostgreSQL, Redis, NATS
+- **Features**:
+  - RESTful API for audit events
+  - Batch event processing
+  - Advanced filtering and pagination
+  - RBAC authentication/authorization (can be disabled)
+  - Health monitoring
+  - Comprehensive logging
 
-## 📖 Documentation
-
-### Quick Links
-- [**Deployment Guide**](docs/deployment.md) - Complete deployment instructions
-- [**Developer Onboarding**](docs/developer-onboarding.md) - Get started as a developer
-- [**API Documentation**](http://localhost:8000/docs) - Interactive API docs
-- [**Architecture Guide**](docs/architecture.md) - System design and architecture
-- [**Monitoring Guide**](docs/monitoring.md) - Observability and monitoring
-- [**Troubleshooting**](docs/troubleshooting.md) - Common issues and solutions
-
-### API Usage Examples
-
-#### Create Audit Log
-```bash
-curl -X POST http://localhost:8000/api/v1/audit/logs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
-  -d '{
-    "event_type": "user_login",
-    "user_id": "user-123",
-    "resource_id": "app-dashboard",
-    "metadata": {
-      "ip_address": "192.168.1.100",
-      "user_agent": "Mozilla/5.0..."
-    }
-  }'
-```
-
-#### Query Audit Logs
-```bash
-curl "http://localhost:8000/api/v1/audit/logs?event_type=user_login&limit=10" \
-  -H "Authorization: Bearer <token>"
-```
-
-#### Batch Create
-```bash
-curl -X POST http://localhost:8000/api/v1/audit/logs/batch \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
-  -d '{
-    "logs": [
-      {"event_type": "user_login", "user_id": "user-1"},
-      {"event_type": "user_logout", "user_id": "user-1"}
-    ]
-  }'
-```
+### Infrastructure
+- **Database**: PostgreSQL 15 with partitioning
+- **Cache**: Redis 7
+- **Message Broker**: NATS with JetStream
+- **Container Orchestration**: Docker Compose
+- **Reverse Proxy**: Nginx (production)
 
 ## 🛠️ Development
 
-### Development Commands
+### Local Development Setup
 
-```bash
-# Quick deployment
-./scripts/deploy.sh development
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd audit-service
+   ```
 
-# Create backup
-./scripts/backup.sh
+2. **Start in development mode:**
+   ```bash
+   ./scripts/start.sh dev
+   ```
 
-# Restore from backup
-./scripts/restore.sh backup_20250827_143000
+3. **Frontend development:**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-# Run tests
-make test
+4. **Backend development:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
 
-# Code quality
-make lint
-make format
-make type-check
+### Environment Variables
 
-# Database operations
-make db-migrate
-make db-reset
-make db-seed
-```
+#### Frontend
+- `VITE_API_URL`: Backend API URL (default: http://localhost:8000)
 
-### Project Structure
+#### Backend
+- `DATABASE_URL`: PostgreSQL connection string
+- `REDIS_URL`: Redis connection string
+- `NATS_URL`: NATS connection string
+- `DEBUG`: Enable debug mode (true/false)
+- `RBAC_AUTHENTICATION_DISABLED`: Disable RBAC authentication (true/false)
+- `RBAC_AUTHORIZATION_DISABLED`: Disable RBAC authorization (true/false)
 
-```
-audit-service/
-├── backend/                 # FastAPI application
-│   ├── app/
-│   │   ├── api/            # API routes and endpoints
-│   │   ├── core/           # Core functionality (auth, config)
-│   │   ├── db/             # Database models and migrations
-│   │   ├── services/       # Business logic services
-│   │   ├── utils/          # Utility functions
-│   │   └── worker/         # Background workers
-│   ├── tests/              # Test suites
-│   └── alembic/            # Database migrations
-├── frontend/               # Backstage.io application
-│   ├── packages/
-│   │   └── audit-plugin/   # Custom audit log plugin
-│   └── app-config.yaml     # Backstage configuration
-├── monitoring/             # Monitoring configuration
-│   ├── grafana/           # Dashboards and provisioning
-│   └── prometheus/        # Metrics and alerts
-├── scripts/               # Deployment and utility scripts
-├── docs/                  # Documentation
-└── docker-compose.yml     # Local development setup
-```
+## 📊 API Endpoints
 
-### Code Standards
+### Audit Events
+- `GET /api/v1/audit/events` - List audit events with filtering
+- `GET /api/v1/audit/events/{id}` - Get specific audit event
+- `POST /api/v1/audit/events` - Create single audit event
+- `POST /api/v1/audit/events/batch` - Create multiple audit events
 
-- **Python**: PEP 8, Black formatting, type hints
-- **API**: RESTful design, OpenAPI documentation
-- **Testing**: 80%+ coverage, unit + integration tests
-- **Git**: Conventional commits, feature branches
-- **Documentation**: Comprehensive inline and external docs
+### Health & Monitoring
+- `GET /api/v1/audit/health` - Service health check
+- `GET /health` - Basic health endpoint
+
+## 🔧 Configuration
+
+### Docker Compose Files
+
+- `docker-compose.yml` - Main production configuration
+- `docker-compose.dev.yml` - Development overrides (hot reload, volumes)
+
+### Frontend Configuration
+
+- `frontend/vite.config.ts` - Vite build configuration
+- `frontend/tailwind.config.js` - Tailwind CSS configuration
+- `frontend/nginx.conf` - Nginx production configuration
+
+### Backend Configuration
+
+- `backend/app/config.py` - Application settings
+- `backend/Dockerfile` - Backend container configuration
 
 ## 🧪 Testing
 
-### Test Suites
-
+### Frontend Tests
 ```bash
-# Unit tests
-pytest backend/tests/unit/
-
-# Integration tests
-pytest backend/tests/integration/
-
-# Load testing
-python tests/load/run_load_tests.py
-
-# Security testing
-python tests/security/security_tests.py
-
-# Full test suite
-./scripts/run-tests.py
+cd frontend
+npm run test
+npm run test:coverage
 ```
 
-### Test Coverage
-
-- **Unit Tests**: 567 test methods across all services
-- **Integration Tests**: 15+ API endpoints tested
-- **Load Tests**: Multiple user profiles, 1000+ RPS capability
-- **Security Tests**: 25+ security validation methods
-
-## 📊 Monitoring & Observability
-
-### Metrics Dashboard
-
-Access comprehensive monitoring at:
-- **Grafana**: http://localhost:3001 (admin/admin123)
-- **Prometheus**: http://localhost:9090
-- **AlertManager**: http://localhost:9093
-
-### Key Metrics
-
-- **Performance**: API response time, throughput, error rates
-- **Business**: Audit log creation rates, tenant activity
-- **System**: Database performance, cache hit rates, resource usage
-- **Security**: Authentication failures, rate limit violations
-
-### Alerting
-
-- **Critical**: System down, database issues, security breaches
-- **Warning**: High latency, error rates, resource usage
-- **Info**: Unusual activity patterns, maintenance events
-
-## 🔒 Security
-
-### Authentication & Authorization
-- **JWT Tokens**: Secure API access with configurable expiration
-- **API Keys**: Service-to-service authentication
-- **RBAC**: Role-based access control with tenant isolation
-- **Rate Limiting**: Per-tenant and global rate limits
-
-### Security Features
-- **Tenant Isolation**: Complete data separation between tenants
-- **Audit Trail**: All actions logged and traceable
-- **Input Validation**: Comprehensive request validation
-- **Security Headers**: OWASP recommended security headers
-
-## 🚀 Deployment
-
-### Local Development
+### Backend Tests
 ```bash
-./scripts/deploy.sh development
+cd backend
+pytest
 ```
 
-### Production Deployment
+### Integration Tests
 ```bash
-./scripts/deploy.sh production
+# Start services
+./scripts/start.sh start
+
+# Run integration tests
+python -m pytest tests/integration/
 ```
 
-### Environment Options
-- **development**: Local development with hot reload
-- **staging**: Staging environment for testing
-- **production**: Production deployment with optimizations
+## 📦 Deployment
 
-### Backup & Recovery
+### Production Build
 ```bash
-# Create backup
-./scripts/backup.sh
+# Build production images
+docker-compose build
 
-# Restore from backup
-./scripts/restore.sh backup_20250827_143000
-
-# Automated backups (cron)
-0 2 * * * /path/to/audit-service/scripts/backup.sh
+# Start production services
+docker-compose up -d
 ```
 
-## 📈 Performance
+### Docker Images
+- Frontend: Nginx serving built React app
+- Backend: Python FastAPI application
+- Database: PostgreSQL with audit log partitioning
+- Cache: Redis for session and data caching
+- Message Broker: NATS for event streaming
 
-### Benchmarks
-- **Throughput**: 1M+ audit events per day
-- **Latency**: < 100ms API response time (95th percentile)
-- **Concurrency**: 1000+ concurrent requests
-- **Storage**: Efficient partitioning and indexing
+## 🔍 Monitoring
 
-### Optimization Features
-- **Connection Pooling**: Optimized database connections
-- **Query Caching**: Redis-based result caching
-- **Batch Processing**: High-throughput batch operations
-- **Async Processing**: Non-blocking I/O operations
+### Health Checks
+All services include health checks:
+- API: HTTP health endpoint
+- Frontend: Nginx health endpoint
+- Database: PostgreSQL connection check
+- Redis: Ping command
+- NATS: HTTP health endpoint
 
-## 🌐 Client SDKs
+### Logging
+- Structured logging with correlation IDs
+- Log aggregation via Docker Compose
+- Separate log volumes for persistence
 
-### Python SDK
-```python
-from audit_client import AuditClient
+## 🚨 Troubleshooting
 
-client = AuditClient(
-    base_url="http://localhost:8000",
-    api_key="your-api-key"
-)
+### Common Issues
 
-# Create audit log
-await client.create_audit_log(
-    event_type="user_login",
-    user_id="user-123",
-    metadata={"ip": "192.168.1.100"}
-)
+1. **Port conflicts:**
+   ```bash
+   # Check what's using the ports
+   lsof -i :3000
+   lsof -i :8000
+   ```
 
-# Query logs
-logs = await client.get_audit_logs(
-    event_type="user_login",
-    limit=100
-)
+2. **Database connection issues:**
+   ```bash
+   # Check database logs
+   docker-compose logs postgres
+   ```
+
+3. **Frontend not loading:**
+   ```bash
+   # Check frontend logs
+   docker-compose logs frontend
+   ```
+
+4. **API not responding:**
+   ```bash
+   # Check API logs
+   docker-compose logs api
+   ```
+
+### Reset Everything
+```bash
+# Stop and clean everything
+./scripts/start.sh clean
+
+# Start fresh
+./scripts/start.sh start
 ```
 
-### Go SDK
-```go
-package main
+## 📝 License
 
-import (
-    "context"
-    "github.com/your-org/audit-client-go"
-)
-
-func main() {
-    client := audit.NewClient("http://localhost:8000", "your-api-key")
-    
-    // Create audit log
-    err := client.CreateAuditLog(context.Background(), &audit.AuditLog{
-        EventType: "user_login",
-        UserID:    "user-123",
-        Metadata:  map[string]interface{}{"ip": "192.168.1.100"},
-    })
-}
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Developer Onboarding Guide](docs/developer-onboarding.md) for detailed information.
-
-### Quick Contribution Steps
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes** and add tests
-4. **Run the test suite**: `make test`
-5. **Submit a pull request**
-
-### Development Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/your-username/audit-service.git
-cd audit-service
-
-# Install pre-commit hooks
-pre-commit install
-
-# Start development environment
-./scripts/deploy.sh development
-
-# Make your changes and test
-make test
-make lint
-```
-
-## 📋 Roadmap
-
-### Phase 11: Cloud Migration Preparation
-- [ ] Terraform modules for GCP infrastructure
-- [ ] BigQuery service layer implementation
-- [ ] Pub/Sub integration with NATS fallback
-- [ ] Kubernetes deployment manifests
-
-### Phase 12: Production Readiness
-- [ ] Data retention and cleanup policies
-- [ ] Backup and disaster recovery procedures
-- [ ] Security hardening configurations
-- [ ] CI/CD pipelines for automated deployment
-
-### Future Enhancements
-- [ ] Machine learning for anomaly detection
-- [ ] Advanced analytics and reporting
-- [ ] Multi-region deployment support
-- [ ] GraphQL API support
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
 ## 📞 Support
 
-### Getting Help
-- **Documentation**: Check the [docs/](docs/) directory
-- **Issues**: Create a GitHub issue for bugs or feature requests
-- **Discussions**: Use GitHub Discussions for questions
-- **Security**: Email security@yourcompany.com for security issues
-
-### Troubleshooting
-- **Common Issues**: See [Troubleshooting Guide](docs/troubleshooting.md)
-- **Health Checks**: `curl http://localhost:8000/health`
-- **Logs**: `docker-compose logs -f`
-- **Metrics**: Check Grafana dashboards
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **FastAPI**: For the excellent web framework
-- **Backstage.io**: For the developer portal platform
-- **PostgreSQL**: For reliable data storage
-- **NATS**: For high-performance messaging
-- **Prometheus & Grafana**: For comprehensive monitoring
-
----
-
-**Built with ❤️ for enterprise-grade audit logging**
-
-For more information, visit our [documentation](docs/) or check out the [API documentation](http://localhost:8000/docs) when running locally.
+For support and questions:
+- Create an issue in the repository
+- Check the documentation
+- Review the API documentation at http://localhost:8000/docs

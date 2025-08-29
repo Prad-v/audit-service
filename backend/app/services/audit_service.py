@@ -23,15 +23,12 @@ from app.core.exceptions import (
 from app.db.database import get_database_manager
 from app.db.schemas import AuditLog, User
 from app.models.audit import (
-    AuditLogCreate,
-    AuditLogBatchCreate,
-    AuditLogResponse,
-    AuditLogQuery,
-    AuditLogSummary,
-    PaginatedAuditLogs,
-    AuditLogExport,
-    EventType,
-    Severity,
+    AuditEventCreate,
+    AuditEventBatchCreate,
+    AuditEventResponse,
+    AuditEventQuery,
+    AuditEventQueryResponse,
+    PaginatedResponse,
 )
 from app.models.base import PaginationParams, SortOrder
 from app.services.nats_service import get_nats_service
@@ -49,12 +46,12 @@ class AuditService:
         self.nats_service = get_nats_service()
         self.cache_service = get_cache_service()
     
-    async def create_audit_log(
+    async def create_audit_event(
         self,
-        audit_data: AuditLogCreate,
+        audit_data: AuditEventCreate,
         tenant_id: str,
         user_id: Optional[str] = None,
-    ) -> AuditLogResponse:
+    ) -> AuditEventResponse:
         """Create a single audit log entry."""
         try:
             # Generate audit log ID
@@ -100,12 +97,12 @@ class AuditService:
                 "Audit log created",
                 audit_id=audit_id,
                 tenant_id=tenant_id,
-                event_type=audit_data.event_type.value,
+                event_type=audit_data.event_type,
                 resource_type=audit_data.resource_type,
                 action=audit_data.action,
             )
             
-            return AuditLogResponse(
+            return AuditEventResponse(
                 audit_id=audit_log.audit_id,
                 timestamp=audit_log.timestamp,
                 event_type=audit_log.event_type,
@@ -135,10 +132,10 @@ class AuditService:
     
     async def create_audit_logs_batch(
         self,
-        batch_data: AuditLogBatchCreate,
+        batch_data: AuditEventBatchCreate,
         tenant_id: str,
         user_id: Optional[str] = None,
-    ) -> List[AuditLogResponse]:
+    ) -> List[AuditEventResponse]:
         """Create multiple audit log entries in a batch."""
         try:
             audit_logs = []
@@ -192,7 +189,7 @@ class AuditService:
             )
             
             return [
-                AuditLogResponse(
+                AuditEventResponse(
                     audit_id=log.audit_id,
                     timestamp=log.timestamp,
                     event_type=log.event_type,
@@ -226,12 +223,12 @@ class AuditService:
         audit_id: str,
         tenant_id: str,
         user_id: str,
-    ) -> AuditLogResponse:
+    ) -> AuditEventResponse:
         """Get a single audit log by ID."""
         try:
             async with self.db_manager.get_session() as session:
                 stmt = select(AuditLog).where(
-                    AuditLog.id == audit_id,
+                    AuditLog.audit_id == audit_id,
                     AuditLog.tenant_id == tenant_id,
                 )
                 result = await session.execute(stmt)
@@ -240,7 +237,7 @@ class AuditService:
                 if not audit_log:
                     raise NotFoundError("Audit log not found")
                 
-                return AuditLogResponse(
+                return AuditEventResponse(
                 audit_id=audit_log.audit_id,
                 timestamp=audit_log.timestamp,
                 event_type=audit_log.event_type,
@@ -271,11 +268,11 @@ class AuditService:
     
     async def query_audit_logs(
         self,
-        query: AuditLogQuery,
+        query: AuditEventQuery,
         tenant_id: str,
         user_id: str,
         pagination: PaginationParams,
-    ) -> PaginatedAuditLogs:
+    ) -> AuditEventQueryResponse:
         """Query audit logs with filtering, sorting, and pagination."""
         try:
             # Check cache first
@@ -283,7 +280,7 @@ class AuditService:
             cached_result = await self.cache_service.get(cache_key)
             if cached_result:
                 # audit_metrics.cache_hits.inc()
-                return PaginatedAuditLogs.parse_obj(cached_result)
+                return AuditEventQueryResponse.parse_obj(cached_result)
             
             async with self.db_manager.get_session() as session:
                 # Build base query
@@ -309,7 +306,7 @@ class AuditService:
                 
                 # Convert to response models
                 items = [
-                    AuditLogResponse(
+                    AuditEventResponse(
                         audit_id=log.audit_id,
                         timestamp=log.timestamp,
                         event_type=log.event_type,
@@ -334,11 +331,14 @@ class AuditService:
                 ]
                 
                 # Create paginated response
-                paginated_result = PaginatedAuditLogs.create(
+                paginated_result = AuditEventQueryResponse(
                     items=items,
                     total_count=total_count,
                     page=pagination.page,
                     page_size=pagination.page_size,
+                    total_pages=(total_count + pagination.page_size - 1) // pagination.page_size,
+                    has_next=pagination.page * pagination.page_size < total_count,
+                    has_previous=pagination.page > 1,
                 )
                 
                 # Cache the result
@@ -367,10 +367,10 @@ class AuditService:
     
     async def get_audit_summary(
         self,
-        query: AuditLogQuery,
+        query: AuditEventQuery,
         tenant_id: str,
         user_id: str,
-    ) -> AuditLogSummary:
+    ) -> AuditEventQueryResponse:
         """Get audit log summary statistics."""
         try:
             async with self.db_manager.get_session() as session:
@@ -430,11 +430,11 @@ class AuditService:
     
     async def export_audit_logs(
         self,
-        query: AuditLogQuery,
+        query: AuditEventQuery,
         tenant_id: str,
         user_id: str,
         export_format: str = "json",
-    ) -> AuditLogExport:
+    ) -> AuditEventQueryResponse:
         """Export audit logs in specified format."""
         try:
             # Limit export size for performance
@@ -490,7 +490,7 @@ class AuditService:
             logger.error("Failed to export audit logs", error=str(e))
             raise
     
-    def _apply_filters(self, stmt, query: AuditLogQuery):
+    def _apply_filters(self, stmt, query: AuditEventQuery):
         """Apply filters to the query statement."""
         if query.start_time:
             stmt = stmt.where(AuditLog.timestamp >= query.start_time)
@@ -545,7 +545,7 @@ class AuditService:
     
     def _build_cache_key(
         self,
-        query: AuditLogQuery,
+        query: AuditEventQuery,
         tenant_id: str,
         pagination: PaginationParams,
     ) -> str:
@@ -563,13 +563,13 @@ class AuditService:
         """Publish single audit event to NATS."""
         try:
             event_data = {
-                "id": audit_log.id,
+                "id": audit_log.audit_id,
                 "tenant_id": audit_log.tenant_id,
-                "event_type": audit_log.event_type.value,
+                "event_type": audit_log.event_type,
                 "resource_type": audit_log.resource_type,
                 "resource_id": audit_log.resource_id,
                 "action": audit_log.action,
-                "severity": audit_log.severity.value,
+                "status": audit_log.status,
                 "timestamp": audit_log.timestamp.isoformat(),
                 "metadata": audit_log.event_metadata,
             }
@@ -591,12 +591,12 @@ class AuditService:
                 "count": len(audit_logs),
                 "events": [
                     {
-                        "id": log.id,
-                        "event_type": log.event_type.value,
+                        "id": log.audit_id,
+                        "event_type": log.event_type,
                         "resource_type": log.resource_type,
                         "resource_id": log.resource_id,
                         "action": log.action,
-                        "severity": log.severity.value,
+                        "status": log.status,
                         "timestamp": log.timestamp.isoformat(),
                     }
                     for log in audit_logs
