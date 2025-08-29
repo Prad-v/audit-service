@@ -137,6 +137,10 @@ async def test_provider_connection(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to test connection: {str(e)}")
 
+
+
+
+
 @router.get("/providers/{provider_id}", response_model=LLMProviderResponse, tags=["LLM Providers"])
 async def get_llm_provider(
     provider_id: str,
@@ -206,3 +210,33 @@ async def summarize_mcp_result(
         return await llm_service.summarize_mcp_result(request)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to summarize result: {str(e)}")
+
+
+@router.get("/default-provider", response_model=LLMProviderResponse, tags=["LLM Providers"])
+async def get_default_provider(
+    llm_service = Depends(get_llm_service)
+):
+    """Get the default LLM provider"""
+    try:
+        provider = await llm_service.get_default_provider()
+        if not provider:
+            raise HTTPException(status_code=404, detail="No default provider configured")
+        return provider
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get default provider: {str(e)}")
+
+
+@router.post("/providers/{provider_id}/set-default", response_model=LLMProviderResponse, tags=["LLM Providers"])
+async def set_default_provider(
+    provider_id: str,
+    llm_service = Depends(get_llm_service)
+):
+    """Set a provider as the default"""
+    try:
+        return await llm_service.set_default_provider(provider_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to set default provider: {str(e)}")

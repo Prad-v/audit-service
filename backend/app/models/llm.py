@@ -73,6 +73,7 @@ class LLMProviderCreate(BaseModel):
     litellm_config: Optional[Dict[str, Any]] = None
     status: LLMProviderStatus = LLMProviderStatus.INACTIVE
     is_enabled: bool = True
+    is_default: bool = False
 
 
 class LLMProviderUpdate(BaseModel):
@@ -85,6 +86,7 @@ class LLMProviderUpdate(BaseModel):
     litellm_config: Optional[Dict[str, Any]] = None
     status: Optional[LLMProviderStatus] = None
     is_enabled: Optional[bool] = None
+    is_default: Optional[bool] = None
 
 
 class LLMProviderResponse(BaseModel):
@@ -99,6 +101,7 @@ class LLMProviderResponse(BaseModel):
     updated_at: datetime
     created_by: Optional[str] = None
     is_enabled: bool = True
+    is_default: bool = False
 
     class Config:
         from_attributes = True

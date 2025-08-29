@@ -14,6 +14,7 @@ interface LLMProvider {
   created_at: string;
   updated_at: string;
   is_enabled?: boolean;
+  is_default?: boolean;
 }
 
 interface ProviderType {
@@ -56,7 +57,8 @@ const LLMProviders: React.FC = () => {
     model_name: '',
     litellm_config: '',
     status: 'inactive',
-    is_enabled: true
+    is_enabled: true,
+    is_default: false
   });
 
   useEffect(() => {
@@ -409,6 +411,26 @@ const LLMProviders: React.FC = () => {
     }
   };
 
+  const setDefaultProvider = async (providerId: string) => {
+    try {
+      const response = await fetch(`/api/v1/llm/providers/${providerId}/set-default`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        console.log('Default provider set successfully');
+        fetchProviders();
+      } else {
+        console.error('Failed to set default provider');
+      }
+    } catch (error) {
+      console.error('Error setting default provider:', error);
+    }
+  };
+
   const openEditModal = (provider: LLMProvider) => {
     setEditingProvider(provider);
     setFormData({
@@ -419,7 +441,8 @@ const LLMProviders: React.FC = () => {
       model_name: provider.model_name,
       litellm_config: provider.litellm_config ? JSON.stringify(provider.litellm_config, null, 2) : '',
       status: provider.status,
-      is_enabled: provider.is_enabled || true
+      is_enabled: provider.is_enabled || true,
+      is_default: provider.is_default || false
     });
     setAvailableModels([]); // Clear models when opening edit modal
     if (provider.provider_type) {
@@ -437,7 +460,8 @@ const LLMProviders: React.FC = () => {
       model_name: '',
       litellm_config: '',
       status: 'inactive',
-      is_enabled: true
+      is_enabled: true,
+      is_default: false
     });
     setAvailableModels([]);
   };
@@ -500,6 +524,9 @@ const LLMProviders: React.FC = () => {
                   Enabled
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Default
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -535,6 +562,22 @@ const LLMProviders: React.FC = () => {
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                           provider.is_enabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      onClick={() => setDefaultProvider(provider.provider_id)}
+                      disabled={provider.is_default}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        provider.is_default ? 'bg-green-600' : 'bg-gray-200'
+                      } ${provider.is_default ? 'cursor-default' : 'cursor-pointer'}`}
+                      title={provider.is_default ? 'Default Provider' : 'Set as Default'}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          provider.is_default ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -578,6 +621,32 @@ const LLMProviders: React.FC = () => {
               No LLM providers configured. Add your first provider to enable AI-powered summarization.
             </div>
           )}
+          
+          {/* Default Provider Info */}
+          {providers.length > 0 && (
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900">Default Provider</h3>
+                  <p className="text-sm text-gray-500">
+                    {providers.find(p => p.is_default) ? (
+                      <>
+                        Current default: <span className="font-medium">{providers.find(p => p.is_default)?.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">(Used automatically for MCP queries when no provider is specified)</span>
+                      </>
+                    ) : (
+                      "No default provider set. MCP queries will return raw results without LLM analysis."
+                    )}
+                  </p>
+                </div>
+                {!providers.find(p => p.is_default) && (
+                  <div className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md">
+                    ⚠️ Set a default provider to enable automatic LLM analysis
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -602,7 +671,8 @@ const LLMProviders: React.FC = () => {
                     model_name: '',
                     litellm_config: '',
                     status: 'inactive',
-                    is_enabled: true
+                    is_enabled: true,
+                    is_default: false
                   });
                   setAvailableModels([]);
                   setConnectionResult(null);
@@ -775,6 +845,16 @@ const LLMProviders: React.FC = () => {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700">Default</label>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_default}
+                      onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-xs text-gray-500">(Only one provider can be default)</span>
+                  </div>
                 </div>
               </div>
 
@@ -793,7 +873,8 @@ const LLMProviders: React.FC = () => {
                       model_name: '',
                       litellm_config: '',
                       status: 'inactive',
-                      is_enabled: true
+                      is_enabled: true,
+                      is_default: false
                     });
                     setAvailableModels([]);
                     setConnectionResult(null);

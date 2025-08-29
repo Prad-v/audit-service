@@ -12,7 +12,7 @@ from datetime import datetime
 from uuid import uuid4
 
 import httpx
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_database_manager
@@ -55,10 +55,15 @@ class LLMService:
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
             created_by=user_id,
-            is_enabled=provider_data.is_enabled
+            is_enabled=provider_data.is_enabled,
+            is_default=provider_data.is_default
         )
         
         async with self.db_manager.get_session() as session:
+            # If this provider is being set as default, unset any existing default
+            if provider_data.is_default:
+                await self._unset_existing_default(session)
+            
             session.add(provider)
             await session.commit()
             await session.refresh(provider)
@@ -73,7 +78,8 @@ class LLMService:
             created_at=provider.created_at,
             updated_at=provider.updated_at,
             created_by=provider.created_by,
-            is_enabled=provider.is_enabled
+            is_enabled=provider.is_enabled,
+            is_default=provider.is_default
         )
     
     async def get_provider(self, provider_id: str) -> LLMProviderResponse:
@@ -96,7 +102,9 @@ class LLMService:
                 base_url=provider.base_url,
                 created_at=provider.created_at,
                 updated_at=provider.updated_at,
-                created_by=provider.created_by
+                created_by=provider.created_by,
+                is_enabled=provider.is_enabled,
+                is_default=provider.is_default
             )
     
     async def list_providers(self, skip: int = 0, limit: int = 100) -> LLMProviderListResponse:
@@ -126,7 +134,9 @@ class LLMService:
                         base_url=p.base_url,
                         created_at=p.created_at,
                         updated_at=p.updated_at,
-                        created_by=p.created_by
+                        created_by=p.created_by,
+                        is_enabled=p.is_enabled,
+                        is_default=p.is_default
                     )
                     for p in providers
                 ],
@@ -161,6 +171,11 @@ class LLMService:
                 provider.litellm_config = update_data.litellm_config
             if update_data.is_enabled is not None:
                 provider.is_enabled = update_data.is_enabled
+            if update_data.is_default is not None:
+                # If setting as default, unset any existing default
+                if update_data.is_default:
+                    await self._unset_existing_default(session)
+                provider.is_default = update_data.is_default
             
             provider.updated_at = datetime.utcnow()
             
@@ -177,7 +192,8 @@ class LLMService:
                 created_at=provider.created_at,
                 updated_at=provider.updated_at,
                 created_by=provider.created_by,
-                is_enabled=provider.is_enabled
+                is_enabled=provider.is_enabled,
+                is_default=provider.is_default
             )
     
     async def delete_provider(self, provider_id: str) -> bool:
@@ -736,6 +752,79 @@ Please provide a natural language summary that answers the user's original quest
 """
         
         return prompt
+
+    async def _unset_existing_default(self, session: AsyncSession) -> None:
+        """Unset any existing default provider"""
+        await session.execute(
+            update(LLMProvider)
+            .where(LLMProvider.is_default == True)
+            .values(is_default=False)
+        )
+        await session.commit()
+
+    async def get_default_provider(self) -> Optional[LLMProviderResponse]:
+        """Get the default LLM provider"""
+        async with self.db_manager.get_session() as session:
+            logger.info("Searching for default provider...")
+            result = await session.execute(
+                select(LLMProvider)
+                .where(and_(LLMProvider.is_default == True, LLMProvider.is_enabled == True))
+            )
+            provider = result.scalar_one_or_none()
+            
+            if not provider:
+                logger.warning("No default provider found")
+                return None
+            
+            logger.info(f"Found default provider: {provider.provider_id}")
+            return LLMProviderResponse(
+                provider_id=provider.provider_id,
+                name=provider.name,
+                provider_type=LLMProviderType(provider.provider_type),
+                status=LLMProviderStatus(provider.status),
+                model_name=provider.model_name,
+                base_url=provider.base_url,
+                created_at=provider.created_at,
+                updated_at=provider.updated_at,
+                created_by=provider.created_by,
+                is_enabled=provider.is_enabled,
+                is_default=provider.is_default
+            )
+
+    async def set_default_provider(self, provider_id: str) -> LLMProviderResponse:
+        """Set a provider as the default"""
+        async with self.db_manager.get_session() as session:
+            # Get the provider
+            result = await session.execute(
+                select(LLMProvider).where(LLMProvider.provider_id == provider_id)
+            )
+            provider = result.scalar_one_or_none()
+            
+            if not provider:
+                raise NotFoundError(f"LLM provider {provider_id} not found")
+            
+            # Unset existing default
+            await self._unset_existing_default(session)
+            
+            # Set new default
+            provider.is_default = True
+            provider.updated_at = datetime.utcnow()
+            await session.commit()
+            await session.refresh(provider)
+            
+            return LLMProviderResponse(
+                provider_id=provider.provider_id,
+                name=provider.name,
+                provider_type=LLMProviderType(provider.provider_type),
+                status=LLMProviderStatus(provider.status),
+                model_name=provider.model_name,
+                base_url=provider.base_url,
+                created_at=provider.created_at,
+                updated_at=provider.updated_at,
+                created_by=provider.created_by,
+                is_enabled=provider.is_enabled,
+                is_default=provider.is_default
+            )
 
 
 # Global LLM service instance

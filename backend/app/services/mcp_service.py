@@ -403,7 +403,7 @@ class MCPAuditService:
             limit = 20
         
         # Determine query type
-        if any(word in query_lower for word in ["count", "how many", "total"]):
+        if any(word in query_lower for word in ["count", "how many", "total", "unique", "distinct", "types", "kinds", "categories"]):
             query_type = QueryType.ANALYTICS
             aggregation = "count"
         elif any(word in query_lower for word in ["trend", "pattern", "over time"]):
@@ -444,16 +444,24 @@ class MCPAuditService:
             else:
                 result = await self._search_audit_events(session, intent)
             
-            # Add LLM summarization if provider is specified
-            if provider_id:
-                from app.services.llm_service import get_llm_service
-                from app.models.llm import LLMSummaryRequest
-                
-                llm_service = get_llm_service()
+            # Add LLM summarization if provider is specified or default provider exists
+            from app.services.llm_service import get_llm_service
+            from app.models.llm import LLMSummaryRequest
+            
+            llm_service = get_llm_service()
+            
+            # Use specified provider_id or get default provider
+            effective_provider_id = provider_id
+            if not effective_provider_id:
+                default_provider = await llm_service.get_default_provider()
+                if default_provider:
+                    effective_provider_id = default_provider.provider_id
+            
+            if effective_provider_id:
                 summary_request = LLMSummaryRequest(
                     query=intent.original_query,
                     mcp_result=result,
-                    provider_id=provider_id
+                    provider_id=effective_provider_id
                 )
                 
                 try:
@@ -467,7 +475,7 @@ class MCPAuditService:
                     logger.error(f"Error generating LLM summary: {e}")
                     result["llm_summary"] = {
                         "summary": "Error generating summary. Showing raw results.",
-                        "provider_used": provider_id,
+                        "provider_used": effective_provider_id,
                         "has_llm_analysis": False
                     }
             
