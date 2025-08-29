@@ -78,6 +78,9 @@ services:
       - NATS_URL=nats://nats:4222
       - LOG_LEVEL=INFO
       - ENVIRONMENT=development
+      - DEBUG=true
+      - RBAC_AUTHENTICATION_DISABLED=true
+      - RBAC_AUTHORIZATION_DISABLED=true
     volumes:
       - ./backend:/app
       - ./logs:/app/logs

@@ -61,7 +61,15 @@ class CacheService:
 _cache_service: Optional[CacheService] = None
 
 
-async def get_cache_service() -> CacheService:
+def get_cache_service() -> CacheService:
+    """Get the global cache service instance."""
+    global _cache_service
+    if not _cache_service:
+        raise CacheError("Cache service not initialized")
+    return _cache_service
+
+
+async def get_cache_service_async() -> CacheService:
     """Dependency to get cache service."""
     global _cache_service
     if not _cache_service:

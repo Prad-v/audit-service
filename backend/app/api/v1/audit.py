@@ -125,10 +125,10 @@ async def create_audit_events_batch(
         user_id, tenant_id, _, _ = get_current_user(request)
         
         # Validate batch size
-        if len(batch_data.audit_logs) > 1000:
+        if len(batch_data.events) > 1000:
             raise ValidationError("Batch size cannot exceed 1000 events")
         
-        if len(batch_data.audit_logs) == 0:
+        if len(batch_data.events) == 0:
             raise ValidationError("Batch cannot be empty")
         
         # Enrich audit logs with client information
@@ -136,7 +136,7 @@ async def create_audit_events_batch(
         user_agent = request.headers.get("user-agent")
         correlation_id = getattr(request.state, "correlation_id", None)
         
-        for audit_log in batch_data.audit_logs:
+        for audit_log in batch_data.events:
             if not audit_log.ip_address:
                 audit_log.ip_address = client_ip
             if not audit_log.user_agent:
@@ -244,7 +244,7 @@ async def get_audit_events(
         logger.info(
             "Audit events queried via API",
             tenant_id=tenant_id,
-            total_results=results.total,
+            total_results=results.total_count,
             page=page,
             size=size,
         )

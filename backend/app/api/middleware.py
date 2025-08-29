@@ -5,6 +5,7 @@ This module provides middleware for authentication, authorization,
 tenant isolation, and request/response processing.
 """
 
+import functools
 import time
 from typing import Optional, Tuple
 from uuid import uuid4
@@ -22,8 +23,12 @@ from app.core.exceptions import (
 from app.core.security import verify_access_token
 from app.models.auth import JWTPayload, UserRole, Permission
 from app.services.auth_service import get_auth_service
+from app.config import get_settings
 
 logger = structlog.get_logger(__name__)
+
+# Get settings instance
+settings = get_settings()
 
 # Security scheme for OpenAPI documentation
 security_scheme = HTTPBearer(auto_error=False)
@@ -39,6 +44,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/redoc",
         "/openapi.json",
         "/health",
+        "/health/",
+        "/health/ready",
+        "/health/live",
+        "/health/detailed",
         "/api/v1/health",
     }
     
@@ -111,6 +120,18 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     
     async def _authenticate_request(self, request: Request) -> None:
         """Authenticate the request using JWT token or API key."""
+        # Check if authentication is disabled
+        if settings.rbac.authentication_disabled:
+            # Set default authentication info for disabled auth
+            request.state.auth_type = "disabled"
+            request.state.user_id = "system"
+            request.state.username = "system"
+            request.state.tenant_id = "default"
+            request.state.roles = ["system_admin"]
+            request.state.permissions = ["*"]
+            logger.info("Authentication disabled - using system defaults")
+            return
+        
         # Try JWT token authentication first
         token = self._extract_bearer_token(request)
         if token:
@@ -307,7 +328,13 @@ def get_current_user(request: Request) -> Tuple[str, str, list[UserRole], list[P
 def require_permission(permission: Permission):
     """Decorator to require a specific permission."""
     def decorator(func):
+        @functools.wraps(func)
         async def wrapper(request: Request, *args, **kwargs):
+            # Check if authorization is disabled
+            if settings.rbac.authorization_disabled:
+                logger.info(f"Authorization disabled - allowing access to {permission.value}")
+                return await func(request, *args, **kwargs)
+            
             _, _, _, permissions = get_current_user(request)
             
             if permission not in permissions:
@@ -326,7 +353,13 @@ def require_permission(permission: Permission):
 def require_role(role: UserRole):
     """Decorator to require a specific role."""
     def decorator(func):
+        @functools.wraps(func)
         async def wrapper(request: Request, *args, **kwargs):
+            # Check if authorization is disabled
+            if settings.rbac.authorization_disabled:
+                logger.info(f"Authorization disabled - allowing access to {role.value}")
+                return await func(request, *args, **kwargs)
+            
             _, _, roles, _ = get_current_user(request)
             
             if role not in roles:

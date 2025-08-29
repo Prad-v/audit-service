@@ -52,14 +52,14 @@ nats_service: NATSService = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(fastapi_app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan manager.
     
     Handles startup and shutdown events for the FastAPI application.
     """
     # Startup
-    logger.info("Starting audit log framework", version=app.version)
+    logger.info("Starting audit log framework", version=fastapi_app.version)
     
     try:
         # Initialize services
@@ -69,19 +69,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Initializing database connection")
         db_manager = DatabaseManager(settings.database)
         await db_manager.initialize()
-        app.state.db = db_manager
+        fastapi_app.state.db = db_manager
+        
+        # Set global database manager for other components
+        from app.db.database import set_database_manager
+        set_database_manager(db_manager)
         
         # Cache
         logger.info("Initializing cache service")
         cache_service = CacheService(settings.redis)
         await cache_service.initialize()
-        app.state.cache = cache_service
+        fastapi_app.state.cache = cache_service
+        
+        # Set global cache service for other components
+        from app.services.cache_service import _cache_service
+        import app.services.cache_service
+        app.services.cache_service._cache_service = cache_service
         
         # NATS
         logger.info("Initializing NATS service")
         nats_service = NATSService(settings.nats)
         await nats_service.initialize()
-        app.state.nats = nats_service
+        fastapi_app.state.nats = nats_service
+        
+        # Set global NATS service for other components
+        import app.services.nats_service
+        app.services.nats_service._nats_service = nats_service
         
         # Setup metrics
         if settings.monitoring.metrics_enabled:

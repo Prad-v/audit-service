@@ -14,6 +14,8 @@ from ipaddress import IPv4Address, IPv6Address
 from pydantic import BaseModel, Field, validator, root_validator
 from pydantic.types import UUID4
 
+from app.models.base import PaginatedResponse
+
 
 class AuditEventStatus(str, Enum):
     """Audit event status enumeration."""
@@ -65,6 +67,7 @@ class BaseAuditModel(BaseModel):
         use_enum_values = True
         validate_assignment = True
         arbitrary_types_allowed = True
+        from_attributes = True
 
 
 class AuditEventCreate(BaseAuditModel):
@@ -81,7 +84,7 @@ class AuditEventCreate(BaseAuditModel):
     status: AuditEventStatus = Field(AuditEventStatus.SUCCESS, description="Status of the action")
     request_data: Optional[Dict[str, Any]] = Field(None, description="Request data (sanitized)")
     response_data: Optional[Dict[str, Any]] = Field(None, description="Response data (sanitized)")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+    metadata: Optional[Union[Dict[str, Any], Any]] = Field(None, description="Additional metadata")
     tenant_id: str = Field(..., description="Tenant ID", max_length=255)
     service_name: str = Field(..., description="Name of the service", max_length=100)
     correlation_id: Optional[str] = Field(None, description="Correlation ID for request tracing", max_length=255)
@@ -136,7 +139,7 @@ class AuditEventResponse(BaseAuditModel):
     event_type: str = Field(..., description="Type of audit event")
     user_id: Optional[str] = Field(None, description="User ID who performed the action")
     session_id: Optional[str] = Field(None, description="Session ID")
-    ip_address: Optional[str] = Field(None, description="IP address of the user")
+    ip_address: Optional[Union[str, IPv4Address, IPv6Address]] = Field(None, description="IP address of the user")
     user_agent: Optional[str] = Field(None, description="User agent string")
     resource_type: Optional[str] = Field(None, description="Type of resource affected")
     resource_id: Optional[str] = Field(None, description="ID of the resource affected")
@@ -144,7 +147,7 @@ class AuditEventResponse(BaseAuditModel):
     status: AuditEventStatus = Field(..., description="Status of the action")
     request_data: Optional[Dict[str, Any]] = Field(None, description="Request data")
     response_data: Optional[Dict[str, Any]] = Field(None, description="Response data")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+    metadata: Optional[Union[Dict[str, Any], Any]] = Field(None, description="Additional metadata")
     tenant_id: str = Field(..., description="Tenant ID")
     service_name: str = Field(..., description="Name of the service")
     correlation_id: Optional[str] = Field(None, description="Correlation ID")
@@ -228,16 +231,17 @@ class AuditEventQuery(BaseAuditModel):
         return values
 
 
-class AuditEventQueryResponse(BaseAuditModel):
+class AuditEventQueryResponse(PaginatedResponse[AuditEventResponse]):
     """Model for audit event query response."""
     
-    events: List[AuditEventResponse] = Field(..., description="List of audit events")
-    total_count: int = Field(..., description="Total number of matching events")
-    page: int = Field(..., description="Current page number")
-    page_size: int = Field(..., description="Page size")
-    total_pages: int = Field(..., description="Total number of pages")
-    has_next: bool = Field(..., description="Whether there are more pages")
-    has_previous: bool = Field(..., description="Whether there are previous pages")
+    # Inherits all fields from PaginatedResponse[AuditEventResponse]
+    # items: List[AuditEventResponse]
+    # total_count: int
+    # page: int
+    # page_size: int
+    # total_pages: int
+    # has_next: bool
+    # has_previous: bool
 
 
 class AuditEventExport(BaseAuditModel):

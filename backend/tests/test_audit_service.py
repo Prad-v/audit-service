@@ -12,11 +12,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import json
 
 from app.models.audit import (
-    AuditLogEventCreate, 
-    AuditLogQuery, 
+    AuditEventCreate, 
+    AuditEventQuery, 
     EventType, 
     Severity,
-    BatchAuditLogCreate
+    AuditEventBatchCreate
 )
 from app.core.exceptions import ValidationError, NotFoundError
 

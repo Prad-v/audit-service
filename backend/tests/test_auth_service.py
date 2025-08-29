@@ -17,7 +17,7 @@ from app.core.exceptions import (
     ValidationError,
     NotFoundError
 )
-from app.core.security import verify_password, create_access_token, decode_access_token
+from app.core.security import verify_password, create_access_token, verify_access_token, hash_password
 
 
 class TestAuthService:
@@ -422,44 +422,53 @@ class TestSecurityFunctions:
             "exp": datetime.utcnow() + timedelta(hours=1)
         }
 
-        token = create_access_token(token_data)
+        token = create_access_token("user-123", "testuser", "tenant-456", ["audit_reader"])
         assert token is not None
         assert isinstance(token, str)
 
-        decoded_data = decode_access_token(token)
-        assert decoded_data["sub"] == "user-123"
-        assert decoded_data["tenant_id"] == "tenant-456"
-        assert decoded_data["roles"] == ["audit_viewer"]
+        decoded_data = verify_access_token(token)
+        assert decoded_data.sub == "user-123"
+        assert decoded_data.tenant_id == "tenant-456"
+        assert decoded_data.roles == ["audit_reader"]
 
     def test_decode_expired_token(self):
         """Test decoding expired JWT token."""
-        token_data = {
-            "sub": "user-123",
-            "tenant_id": "tenant-456",
-            "roles": ["audit_viewer"],
-            "exp": datetime.utcnow() - timedelta(hours=1)  # Expired
-        }
-
-        token = create_access_token(token_data)
+        # Create a token with very short expiration (1 second)
+        token = create_access_token(
+            "user-123", 
+            "testuser", 
+            "tenant-456", 
+            ["audit_reader"],
+            expires_delta=timedelta(seconds=1)
+        )
+        
+        # Wait for token to expire
+        import time
+        time.sleep(2)
         
         with pytest.raises(AuthenticationError):
-            decode_access_token(token)
+            verify_access_token(token)
 
     def test_decode_invalid_token(self):
         """Test decoding invalid JWT token."""
         with pytest.raises(AuthenticationError):
-            decode_access_token("invalid.jwt.token")
+            verify_access_token("invalid.jwt.token")
 
     def test_password_hashing_and_verification(self):
         """Test password hashing and verification."""
         password = "testpassword123"
         
         # Hash password
-        hashed = verify_password(password, password)  # This should work
-        assert hashed is True
+        hashed = hash_password(password)
+        assert hashed is not None
+        assert isinstance(hashed, str)
+        
+        # Verify correct password
+        verification = verify_password(password, hashed)
+        assert verification is True
         
         # Verify wrong password
-        wrong_verification = verify_password("wrongpassword", password)
+        wrong_verification = verify_password("wrongpassword", hashed)
         assert wrong_verification is False
 
 

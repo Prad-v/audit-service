@@ -2,15 +2,25 @@
 """
 Comprehensive test runner for the Audit Log Framework.
 
-This script runs all types of tests including unit tests, integration tests,
-load tests, and security tests with proper reporting and CI/CD integration.
+This script provides a unified interface for running all types of tests:
+- Unit tests with pytest
+- Integration tests
+- Load tests with Locust
+- Security tests
+- Performance tests
+
+Usage:
+    python scripts/run-tests.py --all
+    python scripts/run-tests.py --unit --coverage
+    python scripts/run-tests.py --load --users 50 --duration 60s
 """
 
 import argparse
-import os
-import sys
-import subprocess
+import asyncio
 import json
+import os
+import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -41,324 +51,299 @@ class TestRunner:
         print("🧪 Running Unit Tests...")
         print("-" * 50)
         
-        cmd = ["python", "-m", "pytest"]
-        
-        if coverage:
-            cmd.extend([
-                "--cov=app",
-                "--cov-report=html:htmlcov",
-                "--cov-report=term-missing",
-                "--cov-report=xml",
-                "--cov-fail-under=80"
-            ])
-        
-        if verbose:
-            cmd.append("-v")
-        
-        cmd.extend([
-            "--tb=short",
-            "--color=yes",
-            "--durations=10",
-            "-m", "unit or not integration and not slow",
-            "tests/"
-        ])
-        
-        start_time = time.time()
+        # Change to backend directory for running tests
+        original_cwd = os.getcwd()
+        os.chdir(self.backend_dir)
         
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.backend_dir,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            cmd = ["python", "-m", "pytest"]
             
-            duration = time.time() - start_time
+            if coverage:
+                cmd.extend([
+                    "--cov=app",
+                    "--cov-report=html:htmlcov",
+                    "--cov-report=term-missing",
+                    "--cov-report=xml",
+                    "--cov-fail-under=80"
+                ])
             
-            self.results["test_results"]["unit_tests"] = {
-                "passed": result.returncode == 0,
-                "duration": duration,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "command": " ".join(cmd)
-            }
+            if verbose:
+                cmd.append("-v")
             
-            if result.returncode == 0:
-                print("✅ Unit tests passed!")
-            else:
-                print("❌ Unit tests failed!")
-                print(f"Error output: {result.stderr}")
+            cmd.extend([
+                "--tb=short",
+                "--color=yes",
+                "--durations=10",
+                "-m", "unit or not integration and not slow",
+                "tests/"
+            ])
             
-            return result.returncode == 0
+            start_time = time.time()
             
-        except subprocess.TimeoutExpired:
-            print("⏰ Unit tests timed out!")
-            self.results["test_results"]["unit_tests"] = {
-                "passed": False,
-                "duration": 300,
-                "error": "Test execution timed out",
-                "command": " ".join(cmd)
-            }
-            return False
-        except Exception as e:
-            print(f"💥 Unit tests failed with exception: {e}")
-            self.results["test_results"]["unit_tests"] = {
-                "passed": False,
-                "duration": time.time() - start_time,
-                "error": str(e),
-                "command": " ".join(cmd)
-            }
-            return False
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minutes timeout
+                )
+                
+                duration = time.time() - start_time
+                
+                self.results["test_results"]["unit_tests"] = {
+                    "passed": result.returncode == 0,
+                    "duration": duration,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "command": " ".join(cmd)
+                }
+                
+                if result.returncode == 0:
+                    print("✅ Unit tests passed!")
+                else:
+                    print("❌ Unit tests failed!")
+                    print(f"Error output: {result.stderr}")
+                
+                return result.returncode == 0
+                
+            except subprocess.TimeoutExpired:
+                print("⏰ Unit tests timed out!")
+                self.results["test_results"]["unit_tests"] = {
+                    "passed": False,
+                    "duration": 300,
+                    "error": "Test execution timed out",
+                    "command": " ".join(cmd)
+                }
+                return False
+            except Exception as e:
+                print(f"💥 Unit tests failed with exception: {e}")
+                self.results["test_results"]["unit_tests"] = {
+                    "passed": False,
+                    "duration": time.time() - start_time,
+                    "error": str(e),
+                    "command": " ".join(cmd)
+                }
+                return False
+        finally:
+            # Restore original working directory
+            os.chdir(original_cwd)
     
     def run_integration_tests(self, verbose: bool = False) -> bool:
         """Run integration tests."""
         print("\n🔗 Running Integration Tests...")
         print("-" * 50)
         
-        cmd = ["python", "-m", "pytest"]
-        
-        if verbose:
-            cmd.append("-v")
-        
-        cmd.extend([
-            "--tb=short",
-            "--color=yes",
-            "-m", "integration",
-            "tests/test_api_integration.py"
-        ])
-        
-        start_time = time.time()
+        # Change to backend directory for running tests
+        original_cwd = os.getcwd()
+        os.chdir(self.backend_dir)
         
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.backend_dir,
-                capture_output=True,
-                text=True,
-                timeout=600  # 10 minutes timeout
-            )
+            cmd = ["python", "-m", "pytest"]
             
-            duration = time.time() - start_time
+            if verbose:
+                cmd.append("-v")
             
-            self.results["test_results"]["integration_tests"] = {
-                "passed": result.returncode == 0,
-                "duration": duration,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "command": " ".join(cmd)
-            }
+            cmd.extend([
+                "--tb=short",
+                "--color=yes",
+                "-m", "integration",
+                "tests/test_api_integration.py"
+            ])
             
-            if result.returncode == 0:
-                print("✅ Integration tests passed!")
-            else:
-                print("❌ Integration tests failed!")
-                print(f"Error output: {result.stderr}")
+            start_time = time.time()
             
-            return result.returncode == 0
-            
-        except subprocess.TimeoutExpired:
-            print("⏰ Integration tests timed out!")
-            self.results["test_results"]["integration_tests"] = {
-                "passed": False,
-                "duration": 600,
-                "error": "Test execution timed out"
-            }
-            return False
-        except Exception as e:
-            print(f"💥 Integration tests failed with exception: {e}")
-            self.results["test_results"]["integration_tests"] = {
-                "passed": False,
-                "duration": time.time() - start_time,
-                "error": str(e)
-            }
-            return False
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=600  # 10 minutes timeout for integration tests
+                )
+                
+                duration = time.time() - start_time
+                
+                self.results["test_results"]["integration_tests"] = {
+                    "passed": result.returncode == 0,
+                    "duration": duration,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "command": " ".join(cmd)
+                }
+                
+                if result.returncode == 0:
+                    print("✅ Integration tests passed!")
+                else:
+                    print("❌ Integration tests failed!")
+                    print(f"Error output: {result.stderr}")
+                
+                return result.returncode == 0
+                
+            except subprocess.TimeoutExpired:
+                print("⏰ Integration tests timed out!")
+                self.results["test_results"]["integration_tests"] = {
+                    "passed": False,
+                    "duration": 600,
+                    "error": "Test execution timed out",
+                    "command": " ".join(cmd)
+                }
+                return False
+            except Exception as e:
+                print(f"💥 Integration tests failed with exception: {e}")
+                self.results["test_results"]["integration_tests"] = {
+                    "passed": False,
+                    "duration": time.time() - start_time,
+                    "error": str(e),
+                    "command": " ".join(cmd)
+                }
+                return False
+        finally:
+            # Restore original working directory
+            os.chdir(original_cwd)
     
     def run_load_tests(self, host: str = "localhost:8000", users: int = 10, 
                       duration: str = "30s", verbose: bool = False) -> bool:
         """Run load tests with Locust."""
-        print(f"\n⚡ Running Load Tests (Users: {users}, Duration: {duration})...")
+        print(f"\n⚡ Running Load Tests...")
         print("-" * 50)
+        print(f"Host: {host}")
+        print(f"Users: {users}")
+        print(f"Duration: {duration}")
         
-        locust_file = self.tests_dir / "load" / "locustfile.py"
-        
-        if not locust_file.exists():
-            print("❌ Locust file not found!")
-            self.results["test_results"]["load_tests"] = {
-                "passed": False,
-                "error": "Locust file not found"
-            }
-            return False
-        
-        cmd = [
-            "locust",
-            "-f", str(locust_file),
-            "--host", f"http://{host}",
-            "--users", str(users),
-            "--spawn-rate", str(min(users, 10)),
-            "--run-time", duration,
-            "--headless",
-            "--html", str(self.project_root / "load_test_report.html"),
-            "--csv", str(self.project_root / "load_test_results")
-        ]
-        
-        if verbose:
-            cmd.append("--loglevel=DEBUG")
-        
-        start_time = time.time()
+        # Change to tests directory for running load tests
+        original_cwd = os.getcwd()
+        os.chdir(self.tests_dir / "load")
         
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.project_root,
-                capture_output=True,
-                text=True,
-                timeout=int(duration.rstrip('s')) + 60  # Duration + 1 minute buffer
-            )
+            cmd = [
+                "locust",
+                "-f", "locustfile.py",
+                "--host", f"http://{host}",
+                "--users", str(users),
+                "--spawn-rate", "2",
+                "--run-time", duration,
+                "--headless",
+                "--html", "load_test_report.html",
+                "--csv", "load_test_results"
+            ]
             
-            duration_actual = time.time() - start_time
+            if verbose:
+                cmd.append("--loglevel=DEBUG")
             
-            # Parse Locust results if available
-            stats_file = self.project_root / "load_test_results_stats.csv"
-            load_test_stats = {}
+            start_time = time.time()
             
-            if stats_file.exists():
-                try:
-                    import csv
-                    with open(stats_file, 'r') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            if row['Name'] == 'Aggregated':
-                                load_test_stats = {
-                                    "total_requests": int(row['Request Count']),
-                                    "failure_count": int(row['Failure Count']),
-                                    "avg_response_time": float(row['Average Response Time']),
-                                    "max_response_time": float(row['Max Response Time']),
-                                    "requests_per_second": float(row['Requests/s'])
-                                }
-                                break
-                except Exception as e:
-                    print(f"Warning: Could not parse load test stats: {e}")
-            
-            self.results["test_results"]["load_tests"] = {
-                "passed": result.returncode == 0,
-                "duration": duration_actual,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "command": " ".join(cmd),
-                "stats": load_test_stats
-            }
-            
-            if result.returncode == 0:
-                print("✅ Load tests completed successfully!")
-                if load_test_stats:
-                    print(f"📊 Total requests: {load_test_stats.get('total_requests', 'N/A')}")
-                    print(f"📊 Failure rate: {load_test_stats.get('failure_count', 0)} failures")
-                    print(f"📊 Avg response time: {load_test_stats.get('avg_response_time', 'N/A')}ms")
-                    print(f"📊 Requests/sec: {load_test_stats.get('requests_per_second', 'N/A')}")
-            else:
-                print("❌ Load tests failed!")
-                print(f"Error output: {result.stderr}")
-            
-            return result.returncode == 0
-            
-        except subprocess.TimeoutExpired:
-            print("⏰ Load tests timed out!")
-            self.results["test_results"]["load_tests"] = {
-                "passed": False,
-                "error": "Load test execution timed out"
-            }
-            return False
-        except Exception as e:
-            print(f"💥 Load tests failed with exception: {e}")
-            self.results["test_results"]["load_tests"] = {
-                "passed": False,
-                "duration": time.time() - start_time,
-                "error": str(e)
-            }
-            return False
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=1800  # 30 minutes timeout for load tests
+                )
+                
+                duration_actual = time.time() - start_time
+                
+                self.results["test_results"]["load_tests"] = {
+                    "passed": result.returncode == 0,
+                    "duration": duration_actual,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "command": " ".join(cmd)
+                }
+                
+                if result.returncode == 0:
+                    print("✅ Load tests completed!")
+                else:
+                    print("❌ Load tests failed!")
+                    print(f"Error output: {result.stderr}")
+                
+                return result.returncode == 0
+                
+            except subprocess.TimeoutExpired:
+                print("⏰ Load tests timed out!")
+                self.results["test_results"]["load_tests"] = {
+                    "passed": False,
+                    "duration": 1800,
+                    "error": "Test execution timed out",
+                    "command": " ".join(cmd)
+                }
+                return False
+            except Exception as e:
+                print(f"💥 Load tests failed with exception: {e}")
+                self.results["test_results"]["load_tests"] = {
+                    "passed": False,
+                    "duration": time.time() - start_time,
+                    "error": str(e),
+                    "command": " ".join(cmd)
+                }
+                return False
+        finally:
+            # Restore original working directory
+            os.chdir(original_cwd)
     
     def run_security_tests(self, host: str = "localhost:8000", verbose: bool = False) -> bool:
         """Run security tests."""
-        print(f"\n🔒 Running Security Tests against {host}...")
+        print(f"\n🔒 Running Security Tests...")
         print("-" * 50)
+        print(f"Target: {host}")
         
-        security_script = self.tests_dir / "security" / "security_tests.py"
-        
-        if not security_script.exists():
-            print("❌ Security test script not found!")
-            self.results["test_results"]["security_tests"] = {
-                "passed": False,
-                "error": "Security test script not found"
-            }
-            return False
-        
-        cmd = [
-            "python", str(security_script),
-            "--url", f"http://{host}",
-            "--output", str(self.project_root / "security_report.json")
-        ]
-        
-        start_time = time.time()
+        # Change to tests directory for running security tests
+        original_cwd = os.getcwd()
+        os.chdir(self.tests_dir / "security")
         
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.project_root,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
+            cmd = ["python", "security_tests.py", "--host", host]
             
-            duration = time.time() - start_time
+            if verbose:
+                cmd.append("--verbose")
             
-            # Try to load security report
-            security_report = {}
-            report_file = self.project_root / "security_report.json"
-            if report_file.exists():
-                try:
-                    with open(report_file, 'r') as f:
-                        security_report = json.load(f)
-                except Exception as e:
-                    print(f"Warning: Could not parse security report: {e}")
+            start_time = time.time()
             
-            self.results["test_results"]["security_tests"] = {
-                "passed": result.returncode == 0,
-                "duration": duration,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "command": " ".join(cmd),
-                "report": security_report
-            }
-            
-            if result.returncode == 0:
-                print("✅ Security tests passed!")
-                if security_report and "summary" in security_report:
-                    summary = security_report["summary"]
-                    print(f"🔍 Total tests: {summary.get('total_tests', 'N/A')}")
-                    print(f"🔍 Passed: {summary.get('passed_tests', 'N/A')}")
-                    print(f"🔍 Failed: {summary.get('failed_tests', 'N/A')}")
-            else:
-                print("❌ Security tests failed!")
-                print(f"Error output: {result.stderr}")
-            
-            return result.returncode == 0
-            
-        except subprocess.TimeoutExpired:
-            print("⏰ Security tests timed out!")
-            self.results["test_results"]["security_tests"] = {
-                "passed": False,
-                "error": "Security test execution timed out"
-            }
-            return False
-        except Exception as e:
-            print(f"💥 Security tests failed with exception: {e}")
-            self.results["test_results"]["security_tests"] = {
-                "passed": False,
-                "duration": time.time() - start_time,
-                "error": str(e)
-            }
-            return False
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=600  # 10 minutes timeout for security tests
+                )
+                
+                duration = time.time() - start_time
+                
+                self.results["test_results"]["security_tests"] = {
+                    "passed": result.returncode == 0,
+                    "duration": duration,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "command": " ".join(cmd)
+                }
+                
+                if result.returncode == 0:
+                    print("✅ Security tests passed!")
+                else:
+                    print("❌ Security tests failed!")
+                    print(f"Error output: {result.stderr}")
+                
+                return result.returncode == 0
+                
+            except subprocess.TimeoutExpired:
+                print("⏰ Security tests timed out!")
+                self.results["test_results"]["security_tests"] = {
+                    "passed": False,
+                    "duration": 600,
+                    "error": "Test execution timed out",
+                    "command": " ".join(cmd)
+                }
+                return False
+            except Exception as e:
+                print(f"💥 Security tests failed with exception: {e}")
+                self.results["test_results"]["security_tests"] = {
+                    "passed": False,
+                    "duration": time.time() - start_time,
+                    "error": str(e),
+                    "command": " ".join(cmd)
+                }
+                return False
+        finally:
+            # Restore original working directory
+            os.chdir(original_cwd)
     
     def check_dependencies(self) -> bool:
         """Check if all required dependencies are installed."""

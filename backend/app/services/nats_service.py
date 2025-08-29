@@ -63,7 +63,15 @@ class NATSService:
 _nats_service: Optional[NATSService] = None
 
 
-async def get_nats_service() -> NATSService:
+def get_nats_service() -> NATSService:
+    """Get the global NATS service instance."""
+    global _nats_service
+    if not _nats_service:
+        raise MessageQueueError("NATS service not initialized")
+    return _nats_service
+
+
+async def get_nats_service_async() -> NATSService:
     """Dependency to get NATS service."""
     global _nats_service
     if not _nats_service:

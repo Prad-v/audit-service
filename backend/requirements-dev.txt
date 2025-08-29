@@ -7,6 +7,7 @@ pytest-xdist==3.5.0
 httpx==0.25.2
 factory-boy==3.3.0
 faker==20.1.0
+aiosqlite
 
 # Code quality
 black

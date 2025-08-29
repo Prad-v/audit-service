@@ -87,7 +87,7 @@ class APISettings(BaseSettings):
     port: int = Field(default=8000, description="API server port")
     workers: int = Field(default=4, description="Number of worker processes")
     reload: bool = Field(default=False, description="Enable auto-reload")
-    debug: bool = Field(default=False, description="Enable debug mode")
+    debug: bool = Field(default=True, description="Enable debug mode")
     
     # CORS settings
     cors_origins: List[str] = Field(
@@ -229,6 +229,22 @@ class FeatureFlags(BaseSettings):
         env_prefix = "FEATURE_"
 
 
+class RBACSettings(BaseSettings):
+    """RBAC (Role-Based Access Control) configuration."""
+    
+    authentication_disabled: bool = Field(
+        default=False, 
+        description="Disable authentication (skip login requirements)"
+    )
+    authorization_disabled: bool = Field(
+        default=False, 
+        description="Disable authorization (skip permission checks)"
+    )
+    
+    class Config:
+        env_prefix = "RBAC_"
+
+
 class Settings(BaseSettings):
     """Main application settings."""
     
@@ -252,6 +268,7 @@ class Settings(BaseSettings):
     bigquery: BigQuerySettings = Field(default_factory=BigQuerySettings)
     pubsub: PubSubSettings = Field(default_factory=PubSubSettings)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
+    rbac: RBACSettings = Field(default_factory=RBACSettings)
     
     @validator("environment")
     def validate_environment(cls, v: str) -> str:

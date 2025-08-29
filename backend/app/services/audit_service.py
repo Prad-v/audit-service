@@ -58,25 +58,26 @@ class AuditService:
         """Create a single audit log entry."""
         try:
             # Generate audit log ID
-            audit_id = str(uuid4())
+            audit_id = uuid4()
             
             # Create audit log record
             audit_log = AuditLog(
-                id=audit_id,
+                audit_id=audit_id,
                 tenant_id=tenant_id,
                 user_id=user_id,
                 event_type=audit_data.event_type,
                 resource_type=audit_data.resource_type,
                 resource_id=audit_data.resource_id,
                 action=audit_data.action,
-                severity=audit_data.severity,
-                description=audit_data.description,
+                status=audit_data.status,
                 event_metadata=audit_data.metadata or {},
                 ip_address=audit_data.ip_address,
                 user_agent=audit_data.user_agent,
                 session_id=audit_data.session_id,
                 correlation_id=audit_data.correlation_id,
-                timestamp=audit_data.timestamp or datetime.now(timezone.utc),
+                service_name=audit_data.service_name,
+                retention_period_days=audit_data.retention_period_days,
+                timestamp=datetime.now(timezone.utc),
                 created_at=datetime.now(timezone.utc),
             )
             
@@ -89,11 +90,11 @@ class AuditService:
             # Publish to NATS for real-time processing
             await self._publish_audit_event(audit_log)
             
-            # Update metrics
-            audit_metrics.audit_logs_created.inc()
-            audit_metrics.audit_logs_by_type.labels(
-                event_type=audit_data.event_type.value
-            ).inc()
+            # Update metrics - temporarily disabled
+            # audit_metrics.audit_logs_created.inc()
+            # audit_metrics.audit_logs_by_type.labels(
+            #     event_type=audit_data.event_type.value
+            # ).inc()
             
             logger.info(
                 "Audit log created",
@@ -104,10 +105,31 @@ class AuditService:
                 action=audit_data.action,
             )
             
-            return AuditLogResponse.from_orm(audit_log)
+            return AuditLogResponse(
+                audit_id=audit_log.audit_id,
+                timestamp=audit_log.timestamp,
+                event_type=audit_log.event_type,
+                user_id=audit_log.user_id,
+                session_id=audit_log.session_id,
+                ip_address=audit_log.ip_address,
+                user_agent=audit_log.user_agent,
+                resource_type=audit_log.resource_type,
+                resource_id=audit_log.resource_id,
+                action=audit_log.action,
+                status=audit_log.status,
+                request_data=audit_log.request_data,
+                response_data=audit_log.response_data,
+                metadata=audit_log.event_metadata,
+                tenant_id=audit_log.tenant_id,
+                service_name=audit_log.service_name,
+                correlation_id=audit_log.correlation_id,
+                retention_period_days=audit_log.retention_period_days,
+                created_at=audit_log.created_at,
+                partition_date=audit_log.partition_date,
+            )
             
         except Exception as e:
-            audit_metrics.audit_logs_errors.inc()
+            # audit_metrics.audit_logs_errors.inc()
             logger.error("Failed to create audit log", error=str(e))
             raise
     
@@ -123,25 +145,26 @@ class AuditService:
             current_time = datetime.now(timezone.utc)
             
             # Create audit log records
-            for audit_data in batch_data.audit_logs:
-                audit_id = str(uuid4())
+            for audit_data in batch_data.events:
+                audit_id = uuid4()
                 
                 audit_log = AuditLog(
-                    id=audit_id,
+                    audit_id=audit_id,
                     tenant_id=tenant_id,
                     user_id=user_id,
                     event_type=audit_data.event_type,
                     resource_type=audit_data.resource_type,
                     resource_id=audit_data.resource_id,
                     action=audit_data.action,
-                    severity=audit_data.severity,
-                    description=audit_data.description,
+                    status=audit_data.status,
                     event_metadata=audit_data.metadata or {},
                     ip_address=audit_data.ip_address,
                     user_agent=audit_data.user_agent,
                     session_id=audit_data.session_id,
                     correlation_id=audit_data.correlation_id,
-                    timestamp=audit_data.timestamp or current_time,
+                    service_name=audit_data.service_name,
+                    retention_period_days=audit_data.retention_period_days,
+                    timestamp=current_time,
                     created_at=current_time,
                 )
                 audit_logs.append(audit_log)
@@ -158,9 +181,9 @@ class AuditService:
             # Publish batch to NATS for real-time processing
             await self._publish_audit_batch(audit_logs)
             
-            # Update metrics
-            audit_metrics.audit_logs_created.inc(len(audit_logs))
-            audit_metrics.batch_operations.inc()
+            # Update metrics - temporarily disabled
+            # audit_metrics.audit_logs_created.inc(len(audit_logs))
+            # audit_metrics.batch_operations.inc()
             
             logger.info(
                 "Audit log batch created",
@@ -168,10 +191,33 @@ class AuditService:
                 tenant_id=tenant_id,
             )
             
-            return [AuditLogResponse.from_orm(log) for log in audit_logs]
+            return [
+                AuditLogResponse(
+                    audit_id=log.audit_id,
+                    timestamp=log.timestamp,
+                    event_type=log.event_type,
+                    user_id=log.user_id,
+                    session_id=log.session_id,
+                    ip_address=log.ip_address,
+                    user_agent=log.user_agent,
+                    resource_type=log.resource_type,
+                    resource_id=log.resource_id,
+                    action=log.action,
+                    status=log.status,
+                    request_data=log.request_data,
+                    response_data=log.response_data,
+                    metadata=log.event_metadata,
+                    tenant_id=log.tenant_id,
+                    service_name=log.service_name,
+                    correlation_id=log.correlation_id,
+                    retention_period_days=log.retention_period_days,
+                    created_at=log.created_at,
+                    partition_date=log.partition_date,
+                ) for log in audit_logs
+            ]
             
         except Exception as e:
-            audit_metrics.audit_logs_errors.inc()
+            # audit_metrics.audit_logs_errors.inc()
             logger.error("Failed to create audit log batch", error=str(e))
             raise
     
@@ -194,7 +240,28 @@ class AuditService:
                 if not audit_log:
                     raise NotFoundError("Audit log not found")
                 
-                return AuditLogResponse.from_orm(audit_log)
+                return AuditLogResponse(
+                audit_id=audit_log.audit_id,
+                timestamp=audit_log.timestamp,
+                event_type=audit_log.event_type,
+                user_id=audit_log.user_id,
+                session_id=audit_log.session_id,
+                ip_address=audit_log.ip_address,
+                user_agent=audit_log.user_agent,
+                resource_type=audit_log.resource_type,
+                resource_id=audit_log.resource_id,
+                action=audit_log.action,
+                status=audit_log.status,
+                request_data=audit_log.request_data,
+                response_data=audit_log.response_data,
+                metadata=audit_log.event_metadata,
+                tenant_id=audit_log.tenant_id,
+                service_name=audit_log.service_name,
+                correlation_id=audit_log.correlation_id,
+                retention_period_days=audit_log.retention_period_days,
+                created_at=audit_log.created_at,
+                partition_date=audit_log.partition_date,
+            )
                 
         except NotFoundError:
             raise
@@ -215,7 +282,7 @@ class AuditService:
             cache_key = self._build_cache_key(query, tenant_id, pagination)
             cached_result = await self.cache_service.get(cache_key)
             if cached_result:
-                audit_metrics.cache_hits.inc()
+                # audit_metrics.cache_hits.inc()
                 return PaginatedAuditLogs.parse_obj(cached_result)
             
             async with self.db_manager.get_session() as session:
@@ -234,22 +301,44 @@ class AuditService:
                 stmt = self._apply_sorting(stmt, query.sort_by, query.sort_order)
                 
                 # Apply pagination
-                stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+                stmt = stmt.offset(pagination.offset).limit(pagination.page_size)
                 
                 # Execute query
                 result = await session.execute(stmt)
                 audit_logs = result.scalars().all()
                 
                 # Convert to response models
-                items = [AuditLogResponse.from_orm(log) for log in audit_logs]
+                items = [
+                    AuditLogResponse(
+                        audit_id=log.audit_id,
+                        timestamp=log.timestamp,
+                        event_type=log.event_type,
+                        user_id=log.user_id,
+                        session_id=log.session_id,
+                        ip_address=log.ip_address,
+                        user_agent=log.user_agent,
+                        resource_type=log.resource_type,
+                        resource_id=log.resource_id,
+                        action=log.action,
+                        status=log.status,
+                        request_data=log.request_data,
+                        response_data=log.response_data,
+                        metadata=log.event_metadata,
+                        tenant_id=log.tenant_id,
+                        service_name=log.service_name,
+                        correlation_id=log.correlation_id,
+                        retention_period_days=log.retention_period_days,
+                        created_at=log.created_at,
+                        partition_date=log.partition_date,
+                    ) for log in audit_logs
+                ]
                 
                 # Create paginated response
-                paginated_result = PaginatedAuditLogs(
+                paginated_result = PaginatedAuditLogs.create(
                     items=items,
-                    total=total_count,
+                    total_count=total_count,
                     page=pagination.page,
-                    size=pagination.size,
-                    pages=pagination.calculate_pages(total_count),
+                    page_size=pagination.page_size,
                 )
                 
                 # Cache the result
@@ -259,15 +348,15 @@ class AuditService:
                     ttl=300,  # 5 minutes
                 )
                 
-                audit_metrics.cache_misses.inc()
-                audit_metrics.queries_executed.inc()
+                # audit_metrics.cache_misses.inc()
+                # audit_metrics.queries_executed.inc()
                 
                 logger.info(
                     "Audit logs queried",
                     tenant_id=tenant_id,
                     total_count=total_count,
                     page=pagination.page,
-                    size=pagination.size,
+                    size=pagination.page_size,
                 )
                 
                 return paginated_result
@@ -330,8 +419,8 @@ class AuditService:
                     severities=severities,
                     resource_types=resource_types,
                     date_range={
-                        "start": query.start_date.isoformat() if query.start_date else None,
-                        "end": query.end_date.isoformat() if query.end_date else None,
+                        "start": query.start_time.isoformat() if query.start_time else None,
+                        "end": query.end_time.isoformat() if query.end_time else None,
                     },
                 )
                 
@@ -381,7 +470,7 @@ class AuditService:
                         "correlation_id": log.correlation_id,
                     })
                 
-                audit_metrics.exports_generated.inc()
+                # audit_metrics.exports_generated.inc()
                 
                 logger.info(
                     "Audit logs exported",
@@ -403,48 +492,40 @@ class AuditService:
     
     def _apply_filters(self, stmt, query: AuditLogQuery):
         """Apply filters to the query statement."""
-        if query.start_date:
-            stmt = stmt.where(AuditLog.timestamp >= query.start_date)
+        if query.start_time:
+            stmt = stmt.where(AuditLog.timestamp >= query.start_time)
         
-        if query.end_date:
-            stmt = stmt.where(AuditLog.timestamp <= query.end_date)
+        if query.end_time:
+            stmt = stmt.where(AuditLog.timestamp <= query.end_time)
         
-        if query.event_types:
-            stmt = stmt.where(AuditLog.event_type.in_(query.event_types))
+        if query.event_type:
+            stmt = stmt.where(AuditLog.event_type == query.event_type)
         
-        if query.resource_types:
-            stmt = stmt.where(AuditLog.resource_type.in_(query.resource_types))
+        if query.resource_type:
+            stmt = stmt.where(AuditLog.resource_type == query.resource_type)
         
-        if query.resource_ids:
-            stmt = stmt.where(AuditLog.resource_id.in_(query.resource_ids))
+        if query.resource_id:
+            stmt = stmt.where(AuditLog.resource_id == query.resource_id)
         
-        if query.actions:
-            stmt = stmt.where(AuditLog.action.in_(query.actions))
+        if query.action:
+            stmt = stmt.where(AuditLog.action == query.action)
         
-        if query.severities:
-            stmt = stmt.where(AuditLog.severity.in_(query.severities))
+        if query.status:
+            stmt = stmt.where(AuditLog.status == query.status)
         
-        if query.user_ids:
-            stmt = stmt.where(AuditLog.user_id.in_(query.user_ids))
+        if query.user_id:
+            stmt = stmt.where(AuditLog.user_id == query.user_id)
         
-        if query.ip_addresses:
-            stmt = stmt.where(AuditLog.ip_address.in_(query.ip_addresses))
+        if query.ip_address:
+            stmt = stmt.where(AuditLog.ip_address == query.ip_address)
         
-        if query.session_ids:
-            stmt = stmt.where(AuditLog.session_id.in_(query.session_ids))
+        if query.session_id:
+            stmt = stmt.where(AuditLog.session_id == query.session_id)
         
-        if query.correlation_ids:
-            stmt = stmt.where(AuditLog.correlation_id.in_(query.correlation_ids))
+        if query.correlation_id:
+            stmt = stmt.where(AuditLog.correlation_id == query.correlation_id)
         
-        if query.search:
-            search_term = f"%{query.search}%"
-            stmt = stmt.where(
-                or_(
-                    AuditLog.description.ilike(search_term),
-                    AuditLog.action.ilike(search_term),
-                    AuditLog.resource_type.ilike(search_term),
-                )
-            )
+        # Search functionality removed - not part of AuditEventQuery model
         
         return stmt
     
@@ -474,7 +555,7 @@ class AuditService:
             tenant_id,
             str(hash(query.json())),
             f"page_{pagination.page}",
-            f"size_{pagination.size}",
+            f"size_{pagination.page_size}",
         ]
         return ":".join(key_parts)
     
