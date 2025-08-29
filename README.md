@@ -160,27 +160,49 @@ Once started, the following services will be available:
 
 ## 🧪 Testing
 
-### Frontend Tests
+### Quick Start
 ```bash
-cd frontend
-npm run test
-npm run test:coverage
+# Run all tests
+python3 run_tests.py
+
+# Run specific test types
+python3 run_tests.py --unit
+python3 run_tests.py --integration
+python3 run_tests.py --e2e
+python3 run_tests.py --manual
+
+# Advanced options
+python3 run_tests.py --continue-on-fail
+python3 run_tests.py --verbose
+python3 run_tests.py --ci
 ```
 
-### Backend Tests
-```bash
-cd backend
-pytest
-```
+### Test Categories
+- **Unit Tests**: Individual functions and classes
+- **Integration Tests**: API endpoints and service interactions
+- **E2E Tests**: Complete user workflows
+- **Manual Scripts**: Debugging and performance testing
 
-### Integration Tests
+### Individual Test Types
 ```bash
-# Start services
+# Frontend tests
+cd frontend && npm run test
+
+# Backend tests
+cd backend && pytest
+
+# Integration tests (requires services running)
 ./scripts/start.sh start
-
-# Run integration tests
-python -m pytest tests/integration/
+python3 run_tests.py --integration
 ```
+
+### CI/CD Integration
+The test suite is integrated with GitHub Actions and runs automatically on:
+- Push to main/develop branches
+- Pull requests
+- Manual triggering with custom parameters
+
+For detailed testing information, see [tests/README.md](tests/README.md).
 
 ## 📦 Deployment
 

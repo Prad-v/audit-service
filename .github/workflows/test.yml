@@ -1,0 +1,186 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of tests to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - unit
+        - integration
+        - e2e
+        - manual
+      continue_on_fail:
+        description: 'Continue running tests even if some fail'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.11]
+        node-version: [18]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      
+      nats:
+        image: nats:2-alpine
+        options: >-
+          --health-cmd "nats-server --help"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 4222:4222
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+        pip install -r backend/requirements-dev.txt
+        pip install colorama requests
+    
+    - name: Install Node.js dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Start services with Docker Compose
+      run: |
+        # Start services in background
+        docker-compose up -d postgres redis nats
+        
+        # Wait for services to be ready
+        echo "Waiting for services to be ready..."
+        timeout 60 bash -c 'until docker-compose ps | grep -q "healthy"; do sleep 2; done'
+        
+        # Start API and Frontend services
+        docker-compose up -d api frontend
+        
+        # Wait for API to be ready
+        echo "Waiting for API to be ready..."
+        timeout 120 bash -c 'until curl -f http://localhost:8000/health/ > /dev/null 2>&1; do sleep 5; done'
+        
+        # Wait for Frontend to be ready
+        echo "Waiting for Frontend to be ready..."
+        timeout 60 bash -c 'until curl -f http://localhost:3000 > /dev/null 2>&1; do sleep 5; done'
+    
+    - name: Run Unit Tests
+      if: github.event.inputs.test_type == 'unit' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+      continue-on-error: ${{ github.event.inputs.continue_on_fail || false }}
+      run: |
+        python tests/run_test_suite.py --unit --ci --verbose
+    
+    - name: Run Integration Tests
+      if: github.event.inputs.test_type == 'integration' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+      continue-on-error: ${{ github.event.inputs.continue_on_fail || false }}
+      run: |
+        python tests/run_test_suite.py --integration --ci --verbose
+    
+    - name: Run E2E Tests
+      if: github.event.inputs.test_type == 'e2e' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+      continue-on-error: ${{ github.event.inputs.continue_on_fail || false }}
+      run: |
+        python tests/run_test_suite.py --e2e --ci --verbose
+    
+    - name: Run Manual Scripts
+      if: github.event.inputs.test_type == 'manual' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+      continue-on-error: ${{ github.event.inputs.continue_on_fail || false }}
+      run: |
+        python tests/run_test_suite.py --manual --ci --verbose
+    
+    - name: Run All Tests (if no specific type selected)
+      if: github.event.inputs.test_type == '' && github.event_name == 'push'
+      continue-on-error: ${{ github.event.inputs.continue_on_fail || false }}
+      run: |
+        python tests/run_test_suite.py --all --ci --verbose
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          backend/.pytest_cache/
+          frontend/coverage/
+          test-results/
+        retention-days: 7
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose down -v
+        docker system prune -f
+
+  test-summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download test results
+      uses: actions/download-artifact@v4
+      with:
+        name: test-results
+        path: test-results/
+    
+    - name: Generate test summary
+      run: |
+        echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Test execution completed." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note:** Check the individual test job logs for detailed results." >> $GITHUB_STEP_SUMMARY
