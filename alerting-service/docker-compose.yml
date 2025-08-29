@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  alerting-db:
+    image: postgres:15-alpine
+    container_name: alerting-postgres
+    environment:
+      POSTGRES_DB: alerting_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - alerting_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  alerting-service:
+    build: .
+    container_name: alerting-service
+    environment:
+      ALERTING_DATABASE_URL: postgresql+asyncpg://postgres:postgres@alerting-db:5432/alerting_db
+      ALERTING_API_KEY: alerting-api-key-123
+    ports:
+      - "8001:8001"
+    depends_on:
+      alerting-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  alerting_postgres_data:

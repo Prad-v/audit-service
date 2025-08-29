@@ -177,6 +177,30 @@ services:
       timeout: 10s
       retries: 3
 
+  # Alerting Service
+  alerting:
+    build:
+      context: ./alerting-service
+      dockerfile: Dockerfile
+    container_name: audit-alerting
+    ports:
+      - "8001:8001"
+    environment:
+      - ALERTING_DATABASE_URL=postgresql+asyncpg://audit_user:audit_password@postgres:5432/alerting_db
+      - ALERTING_API_KEY=alerting-api-key-123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - audit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 
 
   # # Prometheus Monitoring
