@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, FileText, Plus, Home, BookOpen, Heart } from 'lucide-react'
+import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { auditApi } from '@/lib/api'
 
@@ -48,6 +48,7 @@ export function Layout({ children }: LayoutProps) {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Audit Logs', href: '/audit-logs', icon: FileText },
     { name: 'Create Event', href: '/create-event', icon: Plus },
+    { name: 'Natural Language Query', href: '/mcp-query', icon: MessageSquare },
   ]
 
   const getHealthColor = (status: string) => {

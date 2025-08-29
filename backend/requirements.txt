@@ -86,3 +86,6 @@ aiofiles==23.2.1
 
 # Data processing
 numpy==1.25.2
+
+# Natural language processing for MCP queries
+nltk==3.8.1

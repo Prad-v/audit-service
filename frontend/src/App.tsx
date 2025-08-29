@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard'
 import { AuditLogs } from './pages/AuditLogs'
 import { CreateEvent } from './pages/CreateEvent'
 import { EventDetails } from './pages/EventDetails'
+import MCPQuery from './pages/MCPQuery'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/audit-logs" element={<AuditLogs />} />
         <Route path="/create-event" element={<CreateEvent />} />
         <Route path="/events/:id" element={<EventDetails />} />
+        <Route path="/mcp-query" element={<MCPQuery />} />
       </Routes>
     </Layout>
   )
