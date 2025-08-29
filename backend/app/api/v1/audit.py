@@ -27,6 +27,14 @@ from app.models.audit import (
     AuditEventQueryResponse,
     PaginatedResponse,
 )
+from app.models.metrics import (
+    MetricsData,
+    IngestionRateData,
+    QueryRateData,
+    TopEventType,
+    SystemMetrics,
+    MetricsResponse,
+)
 from app.models.auth import Permission
 from app.models.base import PaginationParams, SortOrder
 from app.services.audit_service import get_audit_service
@@ -504,4 +512,204 @@ async def audit_health_check():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Audit service unhealthy",
+        )
+
+
+# Metrics endpoints
+@router.get("/metrics", response_model=MetricsResponse)
+@require_permission(Permission.READ_AUDIT)
+async def get_metrics(request: Request):
+    """
+    Get comprehensive metrics for the audit system.
+    
+    This endpoint provides overall metrics including ingestion rate, query rate,
+    top event types, and system performance metrics.
+    
+    **Required Permission**: AUDIT_READ
+    """
+    try:
+        user_id, tenant_id, _, _ = get_current_user(request)
+        
+        audit_service = get_audit_service()
+        result = await audit_service.get_metrics(tenant_id=tenant_id)
+        
+        logger.info("Metrics retrieved", tenant_id=tenant_id)
+        
+        return result
+        
+    except AuthorizationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error("Failed to get metrics", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get("/metrics/ingestion-rate", response_model=List[IngestionRateData])
+@require_permission(Permission.READ_AUDIT)
+async def get_ingestion_rate(
+    request: Request,
+    time_range: str = Query("1h", description="Time range for ingestion rate (e.g., 1h, 24h, 7d)"),
+):
+    """
+    Get event ingestion rate over time.
+    
+    This endpoint provides ingestion rate data points for the specified time range.
+    
+    **Required Permission**: AUDIT_READ
+    """
+    try:
+        user_id, tenant_id, _, _ = get_current_user(request)
+        
+        audit_service = get_audit_service()
+        result = await audit_service.get_ingestion_rate(
+            time_range=time_range,
+            tenant_id=tenant_id,
+        )
+        
+        logger.info("Ingestion rate retrieved", tenant_id=tenant_id, time_range=time_range)
+        
+        return result
+        
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except AuthorizationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error("Failed to get ingestion rate", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get("/metrics/query-rate", response_model=List[QueryRateData])
+@require_permission(Permission.READ_AUDIT)
+async def get_query_rate(
+    request: Request,
+    time_range: str = Query("1h", description="Time range for query rate (e.g., 1h, 24h, 7d)"),
+):
+    """
+    Get query rate over time.
+    
+    This endpoint provides query rate data points for the specified time range.
+    
+    **Required Permission**: AUDIT_READ
+    """
+    try:
+        user_id, tenant_id, _, _ = get_current_user(request)
+        
+        audit_service = get_audit_service()
+        result = await audit_service.get_query_rate(
+            time_range=time_range,
+            tenant_id=tenant_id,
+        )
+        
+        logger.info("Query rate retrieved", tenant_id=tenant_id, time_range=time_range)
+        
+        return result
+        
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except AuthorizationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error("Failed to get query rate", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get("/metrics/top-event-types", response_model=List[TopEventType])
+@require_permission(Permission.READ_AUDIT)
+async def get_top_event_types(
+    request: Request,
+    limit: int = Query(10, description="Number of top event types to return"),
+):
+    """
+    Get top event types by count.
+    
+    This endpoint provides statistics on the most common event types.
+    
+    **Required Permission**: AUDIT_READ
+    """
+    try:
+        user_id, tenant_id, _, _ = get_current_user(request)
+        
+        audit_service = get_audit_service()
+        result = await audit_service.get_top_event_types(
+            limit=limit,
+            tenant_id=tenant_id,
+        )
+        
+        logger.info("Top event types retrieved", tenant_id=tenant_id, limit=limit)
+        
+        return result
+        
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except AuthorizationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error("Failed to get top event types", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@router.get("/metrics/system", response_model=SystemMetrics)
+@require_permission(Permission.READ_AUDIT)
+async def get_system_metrics(request: Request):
+    """
+    Get system performance metrics.
+    
+    This endpoint provides system-level performance metrics including CPU, memory, and disk usage.
+    
+    **Required Permission**: AUDIT_READ
+    """
+    try:
+        user_id, tenant_id, _, _ = get_current_user(request)
+        
+        audit_service = get_audit_service()
+        result = await audit_service.get_system_metrics()
+        
+        logger.info("System metrics retrieved", tenant_id=tenant_id)
+        
+        return result
+        
+    except AuthorizationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error("Failed to get system metrics", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
         )

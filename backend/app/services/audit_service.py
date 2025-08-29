@@ -6,7 +6,7 @@ with high-performance batch processing and filtering capabilities.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from uuid import uuid4
 
@@ -610,6 +610,265 @@ class AuditService:
             
         except Exception as e:
             logger.warning("Failed to publish audit batch to NATS", error=str(e))
+
+    # Metrics methods
+    async def get_metrics(self, tenant_id: str):
+        """Get comprehensive metrics for the audit system."""
+        try:
+            async with self.db_manager.get_session() as session:
+                # Get total events
+                total_events = await session.scalar(
+                    select(func.count(AuditLog.audit_id))
+                    .where(AuditLog.tenant_id == tenant_id)
+                )
+                
+                # Get events today
+                today = datetime.now(timezone.utc).date()
+                events_today = await session.scalar(
+                    select(func.count(AuditLog.audit_id))
+                    .where(
+                        and_(
+                            AuditLog.tenant_id == tenant_id,
+                            func.date(AuditLog.timestamp) == today
+                        )
+                    )
+                )
+                
+                # Get events this hour
+                hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+                events_this_hour = await session.scalar(
+                    select(func.count(AuditLog.audit_id))
+                    .where(
+                        and_(
+                            AuditLog.tenant_id == tenant_id,
+                            AuditLog.timestamp >= hour_ago
+                        )
+                    )
+                )
+                
+                # Calculate ingestion rate (events per minute in last hour)
+                ingestion_rate = events_this_hour / 60.0 if events_this_hour else 0.0
+                
+                # Mock query rate and response time for now
+                query_rate = 5.0  # Mock value
+                avg_response_time = 150.0  # Mock value in milliseconds
+                error_rate = 0.5  # Mock value in percentage
+                
+                from app.models.metrics import (
+                    MetricsData,
+                    IngestionRateData,
+                    QueryRateData,
+                    TopEventType,
+                    SystemMetrics,
+                    MetricsResponse,
+                )
+                
+                # Get top event types
+                top_event_types = await self.get_top_event_types(limit=10, tenant_id=tenant_id)
+                
+                # Get system metrics
+                system_metrics = await self.get_system_metrics()
+                
+                # Create metrics data
+                metrics_data = MetricsData(
+                    total_events=total_events or 0,
+                    events_today=events_today or 0,
+                    events_this_hour=events_this_hour or 0,
+                    ingestion_rate=ingestion_rate,
+                    query_rate=query_rate,
+                    avg_response_time=avg_response_time,
+                    error_rate=error_rate,
+                )
+                
+                # Create mock time series data
+                ingestion_rate_data = [
+                    IngestionRateData(
+                        timestamp=datetime.now(timezone.utc) - timedelta(minutes=i),
+                        rate=ingestion_rate * (0.8 + 0.4 * (i % 3)),  # Mock variation
+                        events_count=int(ingestion_rate * (0.8 + 0.4 * (i % 3)))
+                    )
+                    for i in range(60, 0, -1)
+                ]
+                
+                query_rate_data = [
+                    QueryRateData(
+                        timestamp=datetime.now(timezone.utc) - timedelta(minutes=i),
+                        rate=query_rate * (0.7 + 0.6 * (i % 2)),  # Mock variation
+                        queries_count=int(query_rate * (0.7 + 0.6 * (i % 2)))
+                    )
+                    for i in range(60, 0, -1)
+                ]
+                
+                return MetricsResponse(
+                    metrics=metrics_data,
+                    ingestion_rate_data=ingestion_rate_data,
+                    query_rate_data=query_rate_data,
+                    top_event_types=top_event_types,
+                    system_metrics=system_metrics,
+                )
+                
+        except Exception as e:
+            logger.error("Failed to get metrics", error=str(e))
+            raise
+
+    async def get_ingestion_rate(self, time_range: str, tenant_id: str):
+        """Get event ingestion rate over time."""
+        try:
+            async with self.db_manager.get_session() as session:
+                # Parse time range
+                if time_range == "1h":
+                    start_time = datetime.now(timezone.utc) - timedelta(hours=1)
+                    interval_minutes = 1
+                elif time_range == "24h":
+                    start_time = datetime.now(timezone.utc) - timedelta(hours=24)
+                    interval_minutes = 15
+                elif time_range == "7d":
+                    start_time = datetime.now(timezone.utc) - timedelta(days=7)
+                    interval_minutes = 60
+                else:
+                    start_time = datetime.now(timezone.utc) - timedelta(hours=1)
+                    interval_minutes = 1
+                
+                # Get events in time range
+                events = await session.execute(
+                    select(AuditLog.timestamp)
+                    .where(
+                        and_(
+                            AuditLog.tenant_id == tenant_id,
+                            AuditLog.timestamp >= start_time
+                        )
+                    )
+                    .order_by(AuditLog.timestamp)
+                )
+                
+                events = events.scalars().all()
+                
+                # Calculate rates for intervals
+                from app.models.metrics import IngestionRateData
+                
+                rate_data = []
+                current_time = start_time
+                
+                while current_time < datetime.now(timezone.utc):
+                    end_time = current_time + timedelta(minutes=interval_minutes)
+                    interval_events = [
+                        e for e in events 
+                        if current_time <= e < end_time
+                    ]
+                    
+                    rate = len(interval_events) / interval_minutes
+                    
+                    rate_data.append(IngestionRateData(
+                        timestamp=current_time,
+                        rate=rate,
+                        events_count=len(interval_events)
+                    ))
+                    
+                    current_time = end_time
+                
+                return rate_data
+                
+        except Exception as e:
+            logger.error("Failed to get ingestion rate", error=str(e))
+            raise
+
+    async def get_query_rate(self, time_range: str, tenant_id: str):
+        """Get query rate over time."""
+        try:
+            # Mock implementation for now
+            from app.models.metrics import QueryRateData
+            
+            if time_range == "1h":
+                points = 60
+                interval_minutes = 1
+            elif time_range == "24h":
+                points = 96
+                interval_minutes = 15
+            elif time_range == "7d":
+                points = 168
+                interval_minutes = 60
+            else:
+                points = 60
+                interval_minutes = 1
+            
+            base_rate = 5.0  # Mock base query rate
+            rate_data = []
+            
+            for i in range(points, 0, -1):
+                timestamp = datetime.now(timezone.utc) - timedelta(minutes=i * interval_minutes)
+                rate = base_rate * (0.7 + 0.6 * (i % 3))  # Mock variation
+                
+                rate_data.append(QueryRateData(
+                    timestamp=timestamp,
+                    rate=rate,
+                    queries_count=int(rate * interval_minutes)
+                ))
+            
+            return rate_data
+            
+        except Exception as e:
+            logger.error("Failed to get query rate", error=str(e))
+            raise
+
+    async def get_top_event_types(self, limit: int, tenant_id: str):
+        """Get top event types by count."""
+        try:
+            async with self.db_manager.get_session() as session:
+                # Get total events for percentage calculation
+                total_events = await session.scalar(
+                    select(func.count(AuditLog.audit_id))
+                    .where(AuditLog.tenant_id == tenant_id)
+                )
+                
+                if not total_events:
+                    return []
+                
+                # Get top event types
+                result = await session.execute(
+                    select(
+                        AuditLog.event_type,
+                        func.count(AuditLog.audit_id).label('count')
+                    )
+                    .where(AuditLog.tenant_id == tenant_id)
+                    .group_by(AuditLog.event_type)
+                    .order_by(desc(func.count(AuditLog.audit_id)))
+                    .limit(limit)
+                )
+                
+                from app.models.metrics import TopEventType
+                
+                top_types = []
+                for row in result:
+                    percentage = (row.count / total_events) * 100
+                    top_types.append(TopEventType(
+                        event_type=row.event_type,
+                        count=row.count,
+                        percentage=percentage
+                    ))
+                
+                return top_types
+                
+        except Exception as e:
+            logger.error("Failed to get top event types", error=str(e))
+            raise
+
+    async def get_system_metrics(self):
+        """Get system performance metrics."""
+        try:
+            # Mock implementation for now
+            from app.models.metrics import SystemMetrics
+            
+            return SystemMetrics(
+                cpu_usage=45.2,  # Mock CPU usage percentage
+                memory_usage=67.8,  # Mock memory usage percentage
+                disk_usage=23.4,  # Mock disk usage percentage
+                active_connections=12,  # Mock active database connections
+                database_size=1024 * 1024 * 1024,  # Mock database size in bytes (1GB)
+            )
+            
+        except Exception as e:
+            logger.error("Failed to get system metrics", error=str(e))
+            raise
 
 
 # Global audit service instance
