@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Activity, FileText, Plus, Clock } from 'lucide-react'
+import { Activity, FileText, Plus, Clock, BookOpen, Database, Zap, MessageSquare } from 'lucide-react'
 import { auditApi, type AuditEvent } from '@/lib/api'
 
 export function Dashboard() {
@@ -62,10 +62,94 @@ export function Dashboard() {
         ))}
       </div>
 
+      {/* Detailed Health Status */}
+      {healthData && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">System Health Details</h2>
+          <div className="space-y-4">
+            {/* Overall Status */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center">
+                <Activity className="h-6 w-6 text-gray-600 mr-3" />
+                <div>
+                  <h3 className="font-medium text-gray-900">Overall Status</h3>
+                  <p className="text-sm text-gray-500">System health overview</p>
+                </div>
+              </div>
+              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                healthData.status === 'healthy' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'
+              }`}>
+                {healthData.status}
+              </div>
+            </div>
+
+            {/* Service Status */}
+            {healthData.services && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.entries(healthData.services).map(([service, status]) => {
+                  const getServiceIcon = (serviceName: string) => {
+                    switch (serviceName) {
+                      case 'database':
+                        return Database
+                      case 'redis':
+                        return Zap
+                      case 'nats':
+                        return MessageSquare
+                      default:
+                        return Activity
+                    }
+                  }
+                  const Icon = getServiceIcon(service)
+                  
+                  return (
+                    <div key={service} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center">
+                        <Icon className="h-5 w-5 text-gray-600 mr-3" />
+                        <div>
+                          <h3 className="font-medium text-gray-900 capitalize">{service}</h3>
+                          <p className="text-sm text-gray-500">Service status</p>
+                        </div>
+                      </div>
+                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        status === 'healthy' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'
+                      }`}>
+                        {String(status)}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            
+            {/* Fallback when services data is not available */}
+            {!healthData.services && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center">
+                  <Activity className="h-5 w-5 text-yellow-600 mr-3" />
+                  <div>
+                    <h3 className="font-medium text-yellow-900">Service Status</h3>
+                    <p className="text-sm text-yellow-700">Detailed service status information is not available</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Version Info */}
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+              <div>
+                <h3 className="font-medium text-gray-900">Version</h3>
+                <p className="text-sm text-gray-500">Current system version</p>
+              </div>
+              <span className="text-sm font-medium text-blue-600">{healthData.version}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions */}
       <div className="card">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
             to="/audit-logs"
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -86,6 +170,18 @@ export function Dashboard() {
               <p className="text-sm text-gray-600">Manually create a new audit event</p>
             </div>
           </Link>
+          <a
+            href={`${window.location.origin}/docs`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <BookOpen className="h-8 w-8 text-purple-600 mr-4" />
+            <div>
+              <h3 className="font-medium text-gray-900">Documentation</h3>
+              <p className="text-sm text-gray-600">View API documentation</p>
+            </div>
+          </a>
         </div>
       </div>
 

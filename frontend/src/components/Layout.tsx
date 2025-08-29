@@ -1,20 +1,65 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, FileText, Plus, Home } from 'lucide-react'
+import { Activity, FileText, Plus, Home, BookOpen, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { auditApi } from '@/lib/api'
 
 interface LayoutProps {
   children: ReactNode
 }
 
+interface HealthStatus {
+  status: string
+  timestamp: string
+  version: string
+  environment?: string
+  uptime_seconds?: number
+  services?: {
+    database: string
+    redis: string
+    nats: string
+  }
+}
+
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null)
+  const [isHealthLoading, setIsHealthLoading] = useState(true)
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const health = await auditApi.getHealth()
+        setHealthStatus(health)
+      } catch (error) {
+        console.error('Failed to fetch health status:', error)
+      } finally {
+        setIsHealthLoading(false)
+      }
+    }
+
+    checkHealth()
+    // Check health every 30 seconds
+    const interval = setInterval(checkHealth, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Audit Logs', href: '/audit-logs', icon: FileText },
     { name: 'Create Event', href: '/create-event', icon: Plus },
   ]
+
+  const getHealthColor = (status: string) => {
+    switch (status) {
+      case 'healthy':
+        return 'text-green-600 bg-green-100'
+      case 'unhealthy':
+        return 'text-red-600 bg-red-100'
+      default:
+        return 'text-yellow-600 bg-yellow-100'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -29,6 +74,33 @@ export function Layout({ children }: LayoutProps) {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Health Status */}
+              <div className="flex items-center space-x-2">
+                <Heart className="w-4 h-4 text-gray-400" />
+                {isHealthLoading ? (
+                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse"></div>
+                ) : healthStatus ? (
+                  <div className={cn('px-2 py-1 text-xs font-medium rounded-full', getHealthColor(healthStatus.status))}>
+                    {healthStatus.status}
+                  </div>
+                ) : (
+                  <div className="px-2 py-1 text-xs font-medium rounded-full text-red-600 bg-red-100">
+                    offline
+                  </div>
+                )}
+              </div>
+              
+              {/* Documentation Link */}
+              <a
+                href={`${window.location.origin}/docs`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+              >
+                <BookOpen className="w-4 h-4 mr-2" />
+                Docs
+              </a>
+              
               <span className="text-sm text-gray-500">
                 Version 1.0.0
               </span>
