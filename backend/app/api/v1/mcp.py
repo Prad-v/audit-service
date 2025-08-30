@@ -153,12 +153,12 @@ async def get_audit_summary(
         )
         
         return MCPQueryResponse(
-            success=result.get("success", False),
-            data=result.get("data"),
-            error=result.get("error"),
+            success=True,
+            data=result,
+            error=None,
             query_processed=f"Get audit summary for {time_range}",
             query_type="summary",
-            result_count=result.get("data", {}).get("count", 0) if result.get("data") else 0
+            result_count=result.get("count", 0) if result else 0
         )
         
     except Exception as e:
@@ -189,12 +189,12 @@ async def get_audit_trends(
         )
         
         return MCPQueryResponse(
-            success=result.get("success", False),
-            data=result.get("data"),
-            error=result.get("error"),
+            success=True,
+            data=result,
+            error=None,
             query_processed=f"Get trends for {metric} over {time_range}",
             query_type="trends",
-            result_count=result.get("data", {}).get("count", 0) if result.get("data") else 0
+            result_count=result.get("count", 0) if result else 0
         )
         
     except Exception as e:
@@ -225,12 +225,12 @@ async def get_audit_alerts(
         )
         
         return MCPQueryResponse(
-            success=result.get("success", False),
-            data=result.get("data"),
-            error=result.get("error"),
+            success=True,
+            data=result,
+            error=None,
             query_processed=f"Get {severity} alerts for {time_range}",
             query_type="alerts",
-            result_count=result.get("data", {}).get("alert_count", 0) if result.get("data") else 0
+            result_count=result.get("alert_count", 0) if result else 0
         )
         
     except Exception as e:

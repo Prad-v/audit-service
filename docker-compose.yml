@@ -201,6 +201,28 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Unified API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: audit-api-gateway
+    ports:
+      - "8002:8002"
+    environment:
+      - LOG_LEVEL=INFO
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - audit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
       start_period: 40s
 
 

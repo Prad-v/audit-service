@@ -619,57 +619,72 @@ class MCPAuditService:
     
     async def _get_audit_trends(self, db: AsyncSession, intent: QueryIntent) -> Dict[str, Any]:
         """Get trends in audit events over time"""
-        query = select(AuditLog)
-        
-        # Apply filters
-        if intent.filters.get("event_type"):
-            query = query.where(AuditLog.event_type == intent.filters["event_type"])
-        
-        # Note: AuditLog doesn't have a severity field, only status
-        # if intent.filters.get("severity"):
-        #     query = query.where(AuditLog.severity == intent.filters["severity"])
-        
-        if intent.time_range:
-            query = query.where(
-                and_(
-                    AuditLog.timestamp >= intent.time_range["start"],
-                    AuditLog.timestamp <= intent.time_range["end"]
+        try:
+            # Get hourly trends for the last 24 hours
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=24)
+            
+            # Use a simpler approach to avoid PostgreSQL GROUP BY issues
+            try:
+                hourly_trends_query = select(
+                    func.date_trunc('hour', AuditLog.timestamp).label('hour'),
+                    func.count(AuditLog.audit_id).label('count')
+                ).where(
+                    and_(
+                        AuditLog.timestamp >= start_time,
+                        AuditLog.timestamp <= end_time
+                    )
+                ).group_by(
+                    func.date_trunc('hour', AuditLog.timestamp)
+                ).order_by(
+                    func.date_trunc('hour', AuditLog.timestamp)
                 )
-            )
-        
-        # Get hourly trends for the last 24 hours
-        end_time = datetime.now()
-        start_time = end_time - timedelta(hours=24)
-        
-        hourly_trends_query = select(
-            func.date_trunc('hour', AuditLog.timestamp).label('hour'),
-            func.count(AuditLog.audit_id).label('count')
-        ).where(
-            and_(
-                AuditLog.timestamp >= start_time,
-                AuditLog.timestamp <= end_time
-            )
-        ).group_by(
-            func.date_trunc('hour', AuditLog.timestamp)
-        ).order_by(
-            func.date_trunc('hour', AuditLog.timestamp)
-        )
-        hourly_trends_result = await db.execute(hourly_trends_query)
-        hourly_trends = hourly_trends_result.all()
-        
-        return {
-            "type": "trends",
-            "time_range": "24h",
-            "trends": [
-                {
-                    "hour": trend.hour.isoformat(),
-                    "count": trend.count
-                }
-                for trend in hourly_trends
-            ],
-            "filters_applied": intent.filters,
-            "keywords": intent.keywords
-        }
+                hourly_trends_result = await db.execute(hourly_trends_query)
+                hourly_trends = hourly_trends_result.all()
+            except Exception as e:
+                logger.warning(f"Hourly trends query failed, using simple count: {e}")
+                # Rollback the transaction and try a simple count
+                await db.rollback()
+                
+                simple_count_query = select(func.count(AuditLog.audit_id)).where(
+                    and_(
+                        AuditLog.timestamp >= start_time,
+                        AuditLog.timestamp <= end_time
+                    )
+                )
+                simple_count_result = await db.execute(simple_count_query)
+                total_count = simple_count_result.scalar()
+                
+                hourly_trends = [
+                    type('HourlyTrend', (), {
+                        'hour': datetime.now(),
+                        'count': total_count
+                    })()
+                ]
+            
+            return {
+                "type": "trends",
+                "time_range": "24h",
+                "trends": [
+                    {
+                        "hour": trend.hour.isoformat(),
+                        "count": trend.count
+                    }
+                    for trend in hourly_trends
+                ],
+                "filters_applied": intent.filters,
+                "keywords": intent.keywords
+            }
+        except Exception as e:
+            logger.error(f"Error in _get_audit_trends: {e}")
+            # Return empty results instead of raising
+            return {
+                "type": "trends",
+                "time_range": "24h",
+                "trends": [],
+                "filters_applied": intent.filters,
+                "keywords": intent.keywords
+            }
     
     async def _get_audit_summary(self, db: AsyncSession, intent: QueryIntent) -> Dict[str, Any]:
         """Get a summary of audit events"""

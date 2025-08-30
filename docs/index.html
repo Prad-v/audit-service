@@ -112,9 +112,10 @@
                                 <p class="text-blue-700">
                                     <strong>Live Demo:</strong> 
                                     <a href="http://localhost:3000" class="underline">Frontend UI</a> | 
-                                    <a href="http://localhost:8000/docs" class="underline">API Docs</a> | 
-                                    <a href="http://localhost:8000/health" class="underline">Health Check</a> | 
-                                    <a href="http://localhost:8001/docs" class="underline">Alerting API</a>
+                                    <a href="http://localhost:8002/docs" class="underline">Unified API Docs</a> | 
+                                    <a href="http://localhost:8000/docs" class="underline">Audit API</a> | 
+                                    <a href="http://localhost:8001/docs" class="underline">Alerting API</a> | 
+                                    <a href="http://localhost:8002/health" class="underline">Health Check</a>
                                 </p>
                             </div>
                         </div>
@@ -195,6 +196,21 @@ curl "http://localhost:8000/api/v1/audit/events?event_types=user_login"</code></
                 <!-- API Reference -->
                 <section id="api-reference" class="mb-12">
                     <h2 class="text-3xl font-bold text-gray-900 mb-6">API Reference</h2>
+                    
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-link text-blue-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-blue-700">
+                                    <strong>Unified API Gateway:</strong> 
+                                    All API endpoints are now available through a single unified gateway at 
+                                    <a href="http://localhost:8002/docs" class="underline font-semibold">http://localhost:8002/docs</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="space-y-6">
                         <div class="bg-white rounded-lg shadow-md p-6">
