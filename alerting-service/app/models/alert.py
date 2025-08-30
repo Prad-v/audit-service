@@ -396,6 +396,36 @@ class AlertRuleCreate(BaseModel):
     
     enabled: bool = True
 
+    @model_validator(mode='before')
+    @classmethod
+    def validate_rule_data(cls, data):
+        """Validate rule data based on type"""
+        if isinstance(data, dict):
+            rule_type = data.get("rule_type", "simple")
+            
+            if rule_type == "simple":
+                # For simple rules, ensure required fields are present
+                if not data.get("field") or not data.get("operator") or data.get("value") is None:
+                    raise ValueError("Simple rules require field, operator, and value")
+            elif rule_type == "compound":
+                # For compound rules, ensure conditions and group_operator are present
+                if not data.get("conditions") or not data.get("group_operator"):
+                    raise ValueError("Compound rules require conditions and group_operator")
+                if data.get("group_operator") not in ["AND", "OR"]:
+                    raise ValueError("Group operator must be 'AND' or 'OR'")
+                # Validate each condition
+                for i, condition in enumerate(data.get("conditions", [])):
+                    if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
+                        raise ValueError(f"Condition {i+1} requires field, operator, and value")
+            else:
+                # Auto-detect rule type
+                if data.get("conditions") and data.get("group_operator"):
+                    data["rule_type"] = "compound"
+                else:
+                    data["rule_type"] = "simple"
+        
+        return data
+
 
 class AlertRuleUpdate(BaseModel):
     """Request model for updating alert rule"""

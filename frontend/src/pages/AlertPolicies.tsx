@@ -3,10 +3,20 @@ import { Plus, Edit, Trash2, AlertTriangle, Clock, Users, Settings } from 'lucid
 import { cn } from '@/lib/utils'
 
 interface AlertRule {
-  field: string
-  operator: string
-  value: string | number | boolean
-  case_sensitive: boolean
+  rule_id: string
+  name: string
+  description?: string
+  rule_type: string
+  field?: string
+  operator?: string
+  value?: string | number | boolean
+  case_sensitive?: boolean
+  conditions?: any[]
+  group_operator?: string
+  enabled: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
 }
 
 interface TimeWindow {
@@ -66,6 +76,7 @@ interface AlertPolicyCreate {
 export function AlertPolicies() {
   const [policies, setPolicies] = useState<AlertPolicy[]>([])
   const [providers, setProviders] = useState<AlertProvider[]>([])
+  const [rules, setRules] = useState<AlertRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState<AlertPolicy | null>(null)
@@ -86,6 +97,7 @@ export function AlertPolicies() {
   useEffect(() => {
     fetchPolicies()
     fetchProviders()
+    fetchRules()
   }, [])
 
   const fetchPolicies = async () => {
@@ -119,6 +131,22 @@ export function AlertPolicies() {
       }
     } catch (error) {
       console.error('Failed to fetch providers:', error)
+    }
+  }
+
+  const fetchRules = async () => {
+    try {
+      const response = await fetch('/api/v1/alerts/rules', {
+        headers: {
+          'Authorization': 'Bearer test-token'
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setRules(data.rules || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch rules:', error)
     }
   }
 
@@ -377,6 +405,34 @@ export function AlertPolicies() {
                     <option value="high">High</option>
                     <option value="critical">Critical</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Alert Rules</label>
+                  {rules.length > 0 ? (
+                    <>
+                      <select
+                        multiple
+                        value={formData.rules.map(rule => rule.rule_id || rule.field || '').filter(Boolean)}
+                        onChange={(e) => {
+                          const selectedOptions = Array.from(e.target.selectedOptions, option => option.value)
+                          const selectedRules = rules.filter(rule => selectedOptions.includes(rule.rule_id))
+                          setFormData({ ...formData, rules: selectedRules })
+                        }}
+                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        {rules.map(rule => (
+                          <option key={rule.rule_id} value={rule.rule_id}>
+                            {rule.name} ({rule.rule_type === 'compound' ? 'Compound' : 'Simple'})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-sm text-gray-500">Hold Ctrl/Cmd to select multiple rules</p>
+                    </>
+                  ) : (
+                    <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-700">No rules available. Please create rules first.</p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Message Template</label>

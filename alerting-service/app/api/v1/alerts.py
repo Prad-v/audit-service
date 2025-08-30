@@ -632,91 +632,17 @@ async def create_simple_alert_rule(
         raise HTTPException(status_code=500, detail=f"Error creating simple alert rule: {str(e)}")
 
 
-@router.post("/rules/compound", status_code=status.HTTP_201_CREATED)
-async def create_compound_alert_rule(
-    request: Request,
-    current_user: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Create a new compound alert rule"""
-    try:
-        # Get the raw request body
-        rule_data = await request.json()
-        
-        # Generate rule ID
-        rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
-        
-        # Validate required fields
-        if not rule_data.get("name"):
-            raise HTTPException(status_code=400, detail="Name is required")
-        if not rule_data.get("conditions"):
-            raise HTTPException(status_code=400, detail="Conditions are required")
-        if not rule_data.get("group_operator"):
-            raise HTTPException(status_code=400, detail="Group operator is required")
-        
-        # Validate group operator
-        if rule_data.get("group_operator") not in ["AND", "OR"]:
-            raise HTTPException(status_code=400, detail="Group operator must be 'AND' or 'OR'")
-        
-        # Validate conditions
-        for i, condition in enumerate(rule_data.get("conditions", [])):
-            if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
-                raise HTTPException(status_code=400, detail=f"Condition {i+1} requires field, operator, and value")
-        
-        # Create rule
-        rule = AlertRule(
-            rule_id=rule_id,
-            name=rule_data.get("name"),
-            description=rule_data.get("description"),
-            rule_type="compound",
-            field=None,
-            operator=None,
-            value=None,
-            case_sensitive=None,
-            conditions=rule_data.get("conditions"),
-            group_operator=rule_data.get("group_operator"),
-            enabled=rule_data.get("enabled", True),
-            tenant_id="default",  # TODO: Get from user context
-            created_by=current_user
-        )
-        
-        db.add(rule)
-        await db.commit()
-        await db.refresh(rule)
-        
-        # Return the rule data directly
-        return {
-            "rule_id": rule.rule_id,
-            "name": rule.name,
-            "description": rule.description,
-            "rule_type": rule.rule_type,
-            "conditions": rule.conditions,
-            "group_operator": rule.group_operator,
-            "enabled": rule.enabled,
-            "tenant_id": rule.tenant_id,
-            "created_by": rule.created_by,
-            "created_at": rule.created_at,
-            "updated_at": rule.updated_at
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating compound alert rule: {e}")
-        raise HTTPException(status_code=500, detail=f"Error creating compound alert rule: {str(e)}")
+
 
 
 @router.post("/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert_rule(
-    request: Request,
+    rule_data: dict,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new alert rule (legacy endpoint)"""
     try:
-        # Get the raw request body
-        rule_data = await request.json()
-        
         # Generate rule ID
         rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
         
@@ -735,7 +661,11 @@ async def create_alert_rule(
                 if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
                     raise HTTPException(status_code=400, detail=f"Condition {i+1} requires field, operator, and value")
         else:
-            raise HTTPException(status_code=400, detail="Rule type must be 'simple' or 'compound'")
+            # Auto-detect rule type based on presence of conditions
+            if rule_data.get("conditions") and rule_data.get("group_operator"):
+                rule_type = "compound"
+            else:
+                rule_type = "simple"
         
         # Create rule
         rule = AlertRule(

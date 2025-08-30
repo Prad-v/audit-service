@@ -139,46 +139,38 @@ export function AlertRules() {
     try {
       let response
 
+      // For both simple and compound rules, use the main endpoint
+      const requestData = {
+        name: formData.name,
+        description: formData.description,
+        rule_type: formData.rule_type,
+        enabled: formData.enabled
+      }
+
       if (formData.rule_type === 'simple') {
-        // For simple rules, use the main endpoint
-        const requestData = {
-          name: formData.name,
-          description: formData.description,
-          rule_type: formData.rule_type,
+        // For simple rules, include the single condition fields
+        Object.assign(requestData, {
           field: formData.field,
           operator: formData.operator,
           value: formData.value,
-          case_sensitive: formData.case_sensitive,
-          enabled: formData.enabled
-        }
-
-        response = await fetch('/api/v1/alerts/rules', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer test-token'
-          },
-          body: JSON.stringify(requestData)
+          case_sensitive: formData.case_sensitive
         })
       } else {
-        // For compound rules, use the compound endpoint
-        const requestData = {
-          name: formData.name,
-          description: formData.description,
+        // For compound rules, include the conditions and group operator
+        Object.assign(requestData, {
           conditions: formData.conditions,
-          group_operator: formData.group_operator,
-          enabled: formData.enabled
-        }
-
-        response = await fetch('/api/v1/alerts/rules/compound', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer test-token'
-          },
-          body: JSON.stringify(requestData)
+          group_operator: formData.group_operator
         })
       }
+
+      response = await fetch('/api/v1/alerts/rules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer test-token'
+        },
+        body: JSON.stringify(requestData)
+      })
 
       if (response.ok) {
         setShowCreateModal(false)
