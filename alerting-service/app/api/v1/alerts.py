@@ -8,7 +8,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +16,8 @@ from app.db.schemas import AlertPolicy, AlertProvider, Alert, AlertThrottle, Ale
 from app.models.alert import (
     AlertPolicyCreate, AlertPolicyUpdate, AlertPolicyResponse, AlertPolicyListResponse,
     AlertProviderCreate, AlertProviderUpdate, AlertProviderResponse, AlertProviderListResponse,
-    AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse, AlertRuleListResponse,
+    AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse, AlertRuleListResponse, AlertCondition,
+    SimpleAlertRuleCreate, CompoundAlertRuleCreate,
     AlertResponse, AlertListResponse, AlertSeverity, AlertStatus, AlertProviderType
 )
 from app.core.database import get_db
@@ -578,13 +579,13 @@ async def process_event(
 
 
 # Alert Rules Endpoints
-@router.post("/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
-async def create_alert_rule(
-    rule_data: AlertRuleCreate,
+@router.post("/rules/simple", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
+async def create_simple_alert_rule(
+    rule_data: SimpleAlertRuleCreate,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new alert rule"""
+    """Create a new simple alert rule"""
     try:
         # Generate rule ID
         rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
@@ -594,10 +595,13 @@ async def create_alert_rule(
             rule_id=rule_id,
             name=rule_data.name,
             description=rule_data.description,
+            rule_type="simple",
             field=rule_data.field,
             operator=rule_data.operator,
-            value=str(rule_data.value),  # Convert to string for storage
+            value=str(rule_data.value),
             case_sensitive=rule_data.case_sensitive,
+            conditions=None,
+            group_operator=None,
             enabled=rule_data.enabled,
             tenant_id="default",  # TODO: Get from user context
             created_by=current_user
@@ -608,10 +612,170 @@ async def create_alert_rule(
         await db.refresh(rule)
         
         # Convert value back to original type for response
-        rule.value = rule_data.value
+        if rule.value is not None:
+            try:
+                if rule.value.lower() in ('true', 'false'):
+                    rule.value = rule.value.lower() == 'true'
+                elif rule.value.isdigit():
+                    rule.value = int(rule.value)
+                elif rule.value.replace('.', '').isdigit():
+                    rule.value = float(rule.value)
+                else:
+                    rule.value = rule.value
+            except:
+                rule.value = rule.value
         
         return AlertRuleResponse.from_orm(rule)
         
+    except Exception as e:
+        logger.error(f"Error creating simple alert rule: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating simple alert rule: {str(e)}")
+
+
+@router.post("/rules/compound", status_code=status.HTTP_201_CREATED)
+async def create_compound_alert_rule(
+    request: Request,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new compound alert rule"""
+    try:
+        # Get the raw request body
+        rule_data = await request.json()
+        
+        # Generate rule ID
+        rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
+        
+        # Validate required fields
+        if not rule_data.get("name"):
+            raise HTTPException(status_code=400, detail="Name is required")
+        if not rule_data.get("conditions"):
+            raise HTTPException(status_code=400, detail="Conditions are required")
+        if not rule_data.get("group_operator"):
+            raise HTTPException(status_code=400, detail="Group operator is required")
+        
+        # Validate group operator
+        if rule_data.get("group_operator") not in ["AND", "OR"]:
+            raise HTTPException(status_code=400, detail="Group operator must be 'AND' or 'OR'")
+        
+        # Validate conditions
+        for i, condition in enumerate(rule_data.get("conditions", [])):
+            if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
+                raise HTTPException(status_code=400, detail=f"Condition {i+1} requires field, operator, and value")
+        
+        # Create rule
+        rule = AlertRule(
+            rule_id=rule_id,
+            name=rule_data.get("name"),
+            description=rule_data.get("description"),
+            rule_type="compound",
+            field=None,
+            operator=None,
+            value=None,
+            case_sensitive=None,
+            conditions=rule_data.get("conditions"),
+            group_operator=rule_data.get("group_operator"),
+            enabled=rule_data.get("enabled", True),
+            tenant_id="default",  # TODO: Get from user context
+            created_by=current_user
+        )
+        
+        db.add(rule)
+        await db.commit()
+        await db.refresh(rule)
+        
+        # Return the rule data directly
+        return {
+            "rule_id": rule.rule_id,
+            "name": rule.name,
+            "description": rule.description,
+            "rule_type": rule.rule_type,
+            "conditions": rule.conditions,
+            "group_operator": rule.group_operator,
+            "enabled": rule.enabled,
+            "tenant_id": rule.tenant_id,
+            "created_by": rule.created_by,
+            "created_at": rule.created_at,
+            "updated_at": rule.updated_at
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating compound alert rule: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating compound alert rule: {str(e)}")
+
+
+@router.post("/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
+async def create_alert_rule(
+    request: Request,
+    current_user: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new alert rule (legacy endpoint)"""
+    try:
+        # Get the raw request body
+        rule_data = await request.json()
+        
+        # Generate rule ID
+        rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
+        
+        # Validate rule data based on type
+        rule_type = rule_data.get("rule_type", "simple")
+        if rule_type == "simple":
+            if not rule_data.get("field") or not rule_data.get("operator") or rule_data.get("value") is None:
+                raise HTTPException(status_code=400, detail="Simple rules require field, operator, and value")
+        elif rule_type == "compound":
+            if not rule_data.get("conditions") or not rule_data.get("group_operator"):
+                raise HTTPException(status_code=400, detail="Compound rules require conditions and group_operator")
+            if rule_data.get("group_operator") not in ["AND", "OR"]:
+                raise HTTPException(status_code=400, detail="Group operator must be 'AND' or 'OR'")
+            # Validate that each condition has required fields
+            for i, condition in enumerate(rule_data.get("conditions", [])):
+                if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
+                    raise HTTPException(status_code=400, detail=f"Condition {i+1} requires field, operator, and value")
+        else:
+            raise HTTPException(status_code=400, detail="Rule type must be 'simple' or 'compound'")
+        
+        # Create rule
+        rule = AlertRule(
+            rule_id=rule_id,
+            name=rule_data.get("name"),
+            description=rule_data.get("description"),
+            rule_type=rule_type,
+            field=rule_data.get("field"),
+            operator=rule_data.get("operator"),
+            value=str(rule_data.get("value")) if rule_data.get("value") is not None else None,
+            case_sensitive=rule_data.get("case_sensitive"),
+            conditions=rule_data.get("conditions"),
+            group_operator=rule_data.get("group_operator"),
+            enabled=rule_data.get("enabled", True),
+            tenant_id="default",  # TODO: Get from user context
+            created_by=current_user
+        )
+        
+        db.add(rule)
+        await db.commit()
+        await db.refresh(rule)
+        
+        # Convert value back to original type for response
+        if rule.value is not None:
+            try:
+                if rule.value.lower() in ('true', 'false'):
+                    rule.value = rule.value.lower() == 'true'
+                elif rule.value.isdigit():
+                    rule.value = int(rule.value)
+                elif rule.value.replace('.', '').isdigit():
+                    rule.value = float(rule.value)
+                else:
+                    rule.value = rule.value
+            except:
+                rule.value = rule.value
+        
+        return AlertRuleResponse.from_orm(rule)
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating alert rule: {e}")
         raise HTTPException(status_code=500, detail=f"Error creating alert rule: {str(e)}")
@@ -649,18 +813,19 @@ async def list_alert_rules(
         
         # Convert value back to original type for response
         for rule in rules:
-            try:
-                # Try to convert back to original type
-                if rule.value.lower() in ('true', 'false'):
-                    rule.value = rule.value.lower() == 'true'
-                elif rule.value.isdigit():
-                    rule.value = int(rule.value)
-                elif rule.value.replace('.', '').isdigit():
-                    rule.value = float(rule.value)
-                else:
+            if rule.value is not None:
+                try:
+                    # Try to convert back to original type
+                    if rule.value.lower() in ('true', 'false'):
+                        rule.value = rule.value.lower() == 'true'
+                    elif rule.value.isdigit():
+                        rule.value = int(rule.value)
+                    elif rule.value.replace('.', '').isdigit():
+                        rule.value = float(rule.value)
+                    else:
+                        rule.value = rule.value
+                except:
                     rule.value = rule.value
-            except:
-                rule.value = rule.value
         
         return AlertRuleListResponse(
             rules=[AlertRuleResponse.from_orm(rule) for rule in rules],
@@ -696,17 +861,18 @@ async def get_alert_rule(
             raise HTTPException(status_code=404, detail="Alert rule not found")
         
         # Convert value back to original type for response
-        try:
-            if rule.value.lower() in ('true', 'false'):
-                rule.value = rule.value.lower() == 'true'
-            elif rule.value.isdigit():
-                rule.value = int(rule.value)
-            elif rule.value.replace('.', '').isdigit():
-                rule.value = float(rule.value)
-            else:
+        if rule.value is not None:
+            try:
+                if rule.value.lower() in ('true', 'false'):
+                    rule.value = rule.value.lower() == 'true'
+                elif rule.value.isdigit():
+                    rule.value = int(rule.value)
+                elif rule.value.replace('.', '').isdigit():
+                    rule.value = float(rule.value)
+                else:
+                    rule.value = rule.value
+            except:
                 rule.value = rule.value
-        except:
-            rule.value = rule.value
         
         return AlertRuleResponse.from_orm(rule)
         
@@ -741,7 +907,7 @@ async def update_alert_rule(
         
         # Update fields
         update_data = rule_data.dict(exclude_unset=True)
-        if 'value' in update_data:
+        if 'value' in update_data and update_data['value'] is not None:
             update_data['value'] = str(update_data['value'])
         
         for field, value in update_data.items():
@@ -753,17 +919,18 @@ async def update_alert_rule(
         await db.refresh(rule)
         
         # Convert value back to original type for response
-        try:
-            if rule.value.lower() in ('true', 'false'):
-                rule.value = rule.value.lower() == 'true'
-            elif rule.value.isdigit():
-                rule.value = int(rule.value)
-            elif rule.value.replace('.', '').isdigit():
-                rule.value = float(rule.value)
-            else:
+        if rule.value is not None:
+            try:
+                if rule.value.lower() in ('true', 'false'):
+                    rule.value = rule.value.lower() == 'true'
+                elif rule.value.isdigit():
+                    rule.value = int(rule.value)
+                elif rule.value.replace('.', '').isdigit():
+                    rule.value = float(rule.value)
+                else:
+                    rule.value = rule.value
+            except:
                 rule.value = rule.value
-        except:
-            rule.value = rule.value
         
         return AlertRuleResponse.from_orm(rule)
         

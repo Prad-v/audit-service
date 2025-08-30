@@ -7,7 +7,7 @@ This module defines Pydantic models for alert policies, rules, and providers.
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, timedelta
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 import re
 
 
@@ -56,8 +56,8 @@ class TimeWindow(BaseModel):
         return v
 
 
-class AlertRule(BaseModel):
-    """Alert rule configuration"""
+class AlertRuleConfig(BaseModel):
+    """Alert rule configuration for policies"""
     field: str = Field(..., description="Field to match (e.g., event_type, user_id, status)")
     operator: str = Field(..., description="Comparison operator (eq, ne, gt, lt, gte, lte, in, not_in, contains, regex)")
     value: Union[str, int, float, bool, List[Any]] = Field(..., description="Value to compare against")
@@ -79,7 +79,7 @@ class AlertPolicy(BaseModel):
     enabled: bool = Field(default=True, description="Whether policy is enabled")
     
     # Matching criteria
-    rules: List[AlertRule] = Field(..., description="Alert rules to match")
+    rules: List[AlertRuleConfig] = Field(..., description="Alert rules to match")
     match_all: bool = Field(default=True, description="Whether all rules must match (AND) or any rule (OR)")
     
     # Alert configuration
@@ -230,7 +230,7 @@ class AlertPolicyCreate(BaseModel):
     name: str
     description: Optional[str] = None
     enabled: bool = True
-    rules: List[AlertRule]
+    rules: List[AlertRuleConfig]
     match_all: bool = True
     severity: AlertSeverity = AlertSeverity.MEDIUM
     message_template: str
@@ -246,7 +246,7 @@ class AlertPolicyUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     enabled: Optional[bool] = None
-    rules: Optional[List[AlertRule]] = None
+    rules: Optional[List[AlertRuleConfig]] = None
     match_all: Optional[bool] = None
     severity: Optional[AlertSeverity] = None
     message_template: Optional[str] = None
@@ -300,7 +300,7 @@ class AlertPolicyResponse(BaseModel):
     name: str
     description: Optional[str]
     enabled: bool
-    rules: List[AlertRule]
+    rules: List[AlertRuleConfig]
     match_all: bool
     severity: AlertSeverity
     message_template: str
@@ -350,8 +350,16 @@ class AlertPolicyListResponse(BaseModel):
     per_page: int
 
 
-class AlertRuleCreate(BaseModel):
-    """Request model for creating alert rule"""
+class AlertCondition(BaseModel):
+    """Model for individual alert condition"""
+    field: str
+    operator: str
+    value: Union[str, int, float, bool, List[Any]]
+    case_sensitive: bool = True
+
+
+class SimpleAlertRuleCreate(BaseModel):
+    """Request model for creating simple alert rule"""
     name: str
     description: Optional[str] = None
     field: str
@@ -361,14 +369,50 @@ class AlertRuleCreate(BaseModel):
     enabled: bool = True
 
 
-class AlertRuleUpdate(BaseModel):
-    """Request model for updating alert rule"""
-    name: Optional[str] = None
+class CompoundAlertRuleCreate(BaseModel):
+    """Request model for creating compound alert rule"""
+    name: str
     description: Optional[str] = None
+    conditions: List[AlertCondition]
+    group_operator: str  # "AND" or "OR"
+    enabled: bool = True
+
+
+class AlertRuleCreate(BaseModel):
+    """Request model for creating alert rule"""
+    name: str
+    description: Optional[str] = None
+    rule_type: str = "simple"  # "simple" or "compound"
+    
+    # For simple rules
     field: Optional[str] = None
     operator: Optional[str] = None
     value: Optional[Union[str, int, float, bool, List[Any]]] = None
     case_sensitive: Optional[bool] = None
+    
+    # For compound rules
+    conditions: Optional[List[AlertCondition]] = None
+    group_operator: Optional[str] = None  # "AND" or "OR"
+    
+    enabled: bool = True
+
+
+class AlertRuleUpdate(BaseModel):
+    """Request model for updating alert rule"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    rule_type: Optional[str] = None
+    
+    # For simple rules
+    field: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Union[str, int, float, bool, List[Any]]] = None
+    case_sensitive: Optional[bool] = None
+    
+    # For compound rules
+    conditions: Optional[List[AlertCondition]] = None
+    group_operator: Optional[str] = None
+    
     enabled: Optional[bool] = None
 
 
@@ -377,10 +421,18 @@ class AlertRuleResponse(BaseModel):
     rule_id: str
     name: str
     description: Optional[str]
-    field: str
-    operator: str
-    value: Union[str, int, float, bool, List[Any]]
-    case_sensitive: bool
+    rule_type: str
+    
+    # For simple rules
+    field: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Union[str, int, float, bool, List[Any]]] = None
+    case_sensitive: Optional[bool] = None
+    
+    # For compound rules
+    conditions: Optional[List[AlertCondition]] = None
+    group_operator: Optional[str] = None
+    
     enabled: bool
     tenant_id: str
     created_by: str

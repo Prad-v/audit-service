@@ -75,11 +75,19 @@ class AlertRule(Base, TimestampMixin):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     
-    # Rule configuration
-    field = Column(String(255), nullable=False, index=True)
-    operator = Column(String(50), nullable=False)
-    value = Column(Text, nullable=False)  # Store as text, can be parsed as needed
-    case_sensitive = Column(Boolean, nullable=False, default=True)
+    # Rule configuration - support both simple and compound rules
+    rule_type = Column(String(20), nullable=False, default='simple', index=True)  # 'simple' or 'compound'
+    
+    # For simple rules (backward compatibility)
+    field = Column(String(255), nullable=True, index=True)
+    operator = Column(String(50), nullable=True)
+    value = Column(Text, nullable=True)  # Store as text, can be parsed as needed
+    case_sensitive = Column(Boolean, nullable=True, default=True)
+    
+    # For compound rules
+    conditions = Column(JSON, nullable=True)  # Array of condition objects
+    group_operator = Column(String(10), nullable=True)  # 'AND' or 'OR'
+    
     enabled = Column(Boolean, nullable=False, default=True, index=True)
     
     # Metadata
@@ -87,9 +95,13 @@ class AlertRule(Base, TimestampMixin):
     created_by = Column(String(255), nullable=False, index=True)
     
     __table_args__ = (
-        CheckConstraint("operator IN ('eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'not_in', 'contains', 'regex')", 
+        CheckConstraint("rule_type IN ('simple', 'compound')", name='ck_alert_rules_type'),
+        CheckConstraint("operator IN ('eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'not_in', 'contains', 'regex') OR operator IS NULL", 
                        name='ck_alert_rules_operator'),
+        CheckConstraint("group_operator IN ('AND', 'OR') OR group_operator IS NULL", 
+                       name='ck_alert_rules_group_operator'),
         Index('idx_alert_rules_tenant_enabled', 'tenant_id', 'enabled'),
+        Index('idx_alert_rules_type', 'rule_type'),
         Index('idx_alert_rules_field', 'field'),
         Index('idx_alert_rules_created_by', 'created_by'),
     )
