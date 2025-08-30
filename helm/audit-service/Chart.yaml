@@ -1,6 +1,6 @@
 apiVersion: v2
 name: audit-service
-description: A comprehensive audit logging service with real-time monitoring and analytics
+description: A comprehensive audit logging service with real-time monitoring, analytics, and alerting capabilities
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
@@ -10,6 +10,8 @@ keywords:
   - monitoring
   - analytics
   - security
+  - alerting
+  - notifications
 home: https://github.com/your-org/audit-service
 sources:
   - https://github.com/your-org/audit-service

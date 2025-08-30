@@ -9,6 +9,7 @@ This Helm chart deploys a complete audit logging service with the following comp
 - **Backend API**: FastAPI-based REST API for audit event ingestion and retrieval
 - **Frontend**: React-based web interface for audit log management
 - **Worker**: Background processing for audit event processing
+- **Alerting Service**: Policy-based alerting with multiple providers (PagerDuty, Slack, Webhook, Email)
 - **Monitoring**: Prometheus metrics and Grafana dashboards
 - **Security**: RBAC, network policies, and security contexts
 
@@ -97,6 +98,7 @@ app:
     backend: 3
     frontend: 2
     worker: 2
+    alerting: 2
 ```
 
 #### Resource Limits
@@ -131,6 +133,11 @@ ingress:
           service:
             name: audit-service-backend
             port: 8000
+        - path: /alerts
+          pathType: Prefix
+          service:
+            name: audit-service-alerting
+            port: 8001
 ```
 
 #### Monitoring Configuration
@@ -143,6 +150,26 @@ monitoring:
     interval: 30s
     path: /metrics
     port: metrics
+```
+
+#### Alerting Configuration
+
+```yaml
+alerting:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    ALERTING_DATABASE_URL: "postgresql+asyncpg://user:pass@host:5432/alerting_db"
+    ALERTING_API_KEY: "your-api-key"
+    ALERTING_MAX_ALERTS_PER_HOUR: "100"
+    ALERTING_DEFAULT_THROTTLE_MINUTES: "5"
 ```
 
 ## Architecture
@@ -166,9 +193,16 @@ monitoring:
    - Event processing
    - Batch operations
 
-4. **Services**
+4. **Alerting Deployment**
+   - Policy-based alerting
+   - Multiple provider support
+   - Real-time event processing
+   - Throttling and suppression
+
+5. **Services**
    - Backend service (ClusterIP)
    - Frontend service (ClusterIP)
+   - Alerting service (ClusterIP)
    - Metrics endpoints
 
 5. **Ingress**

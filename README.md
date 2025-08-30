@@ -54,6 +54,9 @@ Once started, the following services will be available:
 | API | http://localhost:8000 | FastAPI backend |
 | API Docs | http://localhost:8000/docs | Swagger documentation |
 | Health Check | http://localhost:8000/health | Service health status |
+| Alerting Service | http://localhost:8001 | Alerting API |
+| Alerting Docs | http://localhost:8001/docs | Alerting API documentation |
+| Alerting Health | http://localhost:8001/health | Alerting service health |
 | PostgreSQL | localhost:5432 | Database |
 | Redis | localhost:6379 | Cache |
 | NATS | localhost:4222 | Message broker |
@@ -85,6 +88,13 @@ Once started, the following services will be available:
 - **Message Broker**: NATS with JetStream
 - **Container Orchestration**: Docker Compose
 - **Reverse Proxy**: Nginx (production)
+
+### Alerting System
+- **Policy-Based Alerting**: Flexible rule matching with multiple operators
+- **Multiple Providers**: PagerDuty, Slack, Webhook, Email
+- **Throttling & Suppression**: Prevent alert fatigue
+- **Real-time Processing**: Async event processing and alert delivery
+- **Scalable Architecture**: Horizontal scaling support
 
 ## 🛠️ Development
 
@@ -140,6 +150,14 @@ Once started, the following services will be available:
 - `GET /api/v1/audit/health` - Service health check
 - `GET /health` - Basic health endpoint
 
+### Alerting System
+- `POST /api/v1/alerts/policies` - Create alert policy
+- `GET /api/v1/alerts/policies` - List alert policies
+- `POST /api/v1/alerts/providers` - Create alert provider
+- `GET /api/v1/alerts/providers` - List alert providers
+- `POST /api/v1/alerts/process-event` - Process event and trigger alerts
+- `GET /api/v1/alerts/alerts` - List alerts
+
 ## 🔧 Configuration
 
 ### Docker Compose Files
@@ -194,6 +212,9 @@ cd backend && pytest
 # Integration tests (requires services running)
 ./scripts/start.sh start
 python3 run_tests.py --integration
+
+# E2E alerting tests
+python3 tests/e2e/test_alerting_e2e.py
 ```
 
 ### CI/CD Integration

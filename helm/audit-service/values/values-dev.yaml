@@ -12,6 +12,7 @@ app:
     backend: 1
     frontend: 1
     worker: 1
+    alerting: 1
 
 namespace:
   name: audit-service-dev
@@ -52,10 +53,28 @@ worker:
       cpu: 500m
       memory: 512Mi
 
+alerting:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    ENVIRONMENT: "development"
+    LOG_LEVEL: "DEBUG"
+    ALERTING_DATABASE_URL: "postgresql+asyncpg://audit_user:audit_password@postgres-service:5432/alerting_db"
+    ALERTING_API_KEY: "dev-api-key-123"
+
 hpa:
   backend:
     enabled: false
   frontend:
+    enabled: false
+  alerting:
     enabled: false
 
 ingress:

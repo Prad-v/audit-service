@@ -86,6 +86,9 @@
                     <a href="#testing" class="block px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md transition-colors">
                         <i class="fas fa-vial mr-2"></i>Testing
                     </a>
+                    <a href="#alerting" class="block px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md transition-colors">
+                        <i class="fas fa-bell mr-2"></i>Alerting
+                    </a>
                     <a href="#troubleshooting" class="block px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md transition-colors">
                         <i class="fas fa-tools mr-2"></i>Troubleshooting
                     </a>
@@ -110,14 +113,15 @@
                                     <strong>Live Demo:</strong> 
                                     <a href="http://localhost:3000" class="underline">Frontend UI</a> | 
                                     <a href="http://localhost:8000/docs" class="underline">API Docs</a> | 
-                                    <a href="http://localhost:8000/health" class="underline">Health Check</a>
+                                    <a href="http://localhost:8000/health" class="underline">Health Check</a> | 
+                                    <a href="http://localhost:8001/docs" class="underline">Alerting API</a>
                                 </p>
                             </div>
                         </div>
                     </div>
 
                     <p class="text-lg text-gray-700 mb-6">
-                        The Audit Service is a comprehensive audit logging system that provides secure, scalable, and real-time audit trail capabilities for your applications.
+                        The Audit Service is a comprehensive audit logging system that provides secure, scalable, and real-time audit trail capabilities for your applications. It includes a powerful alerting system for real-time event monitoring and notification.
                     </p>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -922,6 +926,236 @@ curl -X POST http://localhost:8000/api/v1/audit/events \
                     </div>
                 </section>
 
+                <!-- Alerting -->
+                <section id="alerting" class="mb-12">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-6">Alerting System</h2>
+                    
+                    <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-8">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-bell text-green-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-green-700">
+                                    <strong>Alerting Service:</strong> 
+                                    <a href="http://localhost:8001/docs" class="underline">Alerting API Docs</a> | 
+                                    <a href="http://localhost:8001/health" class="underline">Health Check</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-lg text-gray-700 mb-6">
+                        The Alerting Service provides real-time, policy-based alerting capabilities for audit events. It supports multiple alert providers including PagerDuty, Slack, Webhook, and Email.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <div class="text-red-500 mb-4">
+                                <i class="fas fa-shield-alt text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Policy-Based Alerting</h3>
+                            <p class="text-gray-600">Define flexible alert policies with complex rule matching and multiple operators</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <div class="text-blue-500 mb-4">
+                                <i class="fas fa-plug text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Multiple Providers</h3>
+                            <p class="text-gray-600">Support for PagerDuty, Slack, Webhook, and Email alert delivery</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <div class="text-yellow-500 mb-4">
+                                <i class="fas fa-clock text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Throttling & Suppression</h3>
+                            <p class="text-gray-600">Prevent alert fatigue with configurable throttling and suppression rules</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <div class="text-purple-500 mb-4">
+                                <i class="fas fa-chart-line text-2xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">Scalable Architecture</h3>
+                            <p class="text-gray-600">Horizontal scaling support with async processing and delivery tracking</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h3 class="text-xl font-semibold mb-4">Quick Start with Alerting</h3>
+                            <div class="code-block">
+                                <pre><code># Start the alerting service
+docker-compose up -d alerting
+
+# Create a webhook provider
+curl -X POST http://localhost:8001/api/v1/alerts/providers \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Test Webhook",
+    "provider_type": "webhook",
+    "config": {
+      "url": "http://localhost:8080/webhook",
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"}
+    }
+  }'
+
+# Create an alert policy
+curl -X POST http://localhost:8001/api/v1/alerts/policies \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Failed Login Alerts",
+    "rules": [
+      {"field": "event_type", "operator": "eq", "value": "user_login"},
+      {"field": "status", "operator": "eq", "value": "failed"}
+    ],
+    "severity": "high",
+    "message_template": "Failed login by {user_id} from {ip_address}",
+    "providers": ["webhook-001"]
+  }'
+
+# Process an event to trigger alerts
+curl -X POST http://localhost:8001/api/v1/alerts/process-event \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "user_login",
+    "user_id": "john.doe",
+    "ip_address": "192.168.1.100",
+    "status": "failed"
+  }'</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h3 class="text-xl font-semibold mb-4">Alert Policy Configuration</h3>
+                            <p class="text-gray-700 mb-4">Alert policies support flexible rule matching with multiple operators:</p>
+                            <div class="code-block">
+                                <pre><code>{
+  "name": "Security Alert Policy",
+  "description": "Alert on security-related events",
+  "enabled": true,
+  "rules": [
+    {
+      "field": "event_type",
+      "operator": "in",
+      "value": ["user_login", "permission_change", "data_access"],
+      "case_sensitive": true
+    },
+    {
+      "field": "severity",
+      "operator": "gte",
+      "value": "high",
+      "case_sensitive": false
+    }
+  ],
+  "match_all": true,
+  "severity": "critical",
+  "message_template": "Security alert: {event_type} by {user_id}",
+  "summary_template": "Security event detected",
+  "throttle_minutes": 5,
+  "max_alerts_per_hour": 10,
+  "providers": ["pagerduty-001", "slack-001"]
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h3 class="text-xl font-semibold mb-4">Supported Alert Providers</h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="border rounded-lg p-4">
+                                    <h4 class="font-semibold text-red-600 mb-2">PagerDuty</h4>
+                                    <p class="text-sm text-gray-600 mb-2">Incident management and on-call alerts</p>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "provider_type": "pagerduty",
+  "config": {
+    "api_key": "your-api-key",
+    "service_id": "your-service-id",
+    "urgency": "high"
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="border rounded-lg p-4">
+                                    <h4 class="font-semibold text-blue-600 mb-2">Slack</h4>
+                                    <p class="text-sm text-gray-600 mb-2">Team communication and notifications</p>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "provider_type": "slack",
+  "config": {
+    "webhook_url": "https://hooks.slack.com/...",
+    "channel": "#alerts",
+    "username": "Alert Bot"
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="border rounded-lg p-4">
+                                    <h4 class="font-semibold text-green-600 mb-2">Webhook</h4>
+                                    <p class="text-sm text-gray-600 mb-2">Custom HTTP endpoint integration</p>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "provider_type": "webhook",
+  "config": {
+    "url": "https://your-endpoint.com/webhook",
+    "method": "POST",
+    "headers": {"X-Custom-Header": "value"}
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="border rounded-lg p-4">
+                                    <h4 class="font-semibold text-purple-600 mb-2">Email</h4>
+                                    <p class="text-sm text-gray-600 mb-2">SMTP-based email notifications</p>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "provider_type": "email",
+  "config": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_username": "alerts@company.com",
+    "smtp_password": "your-password",
+    "from_email": "alerts@company.com",
+    "to_emails": ["admin@company.com"]
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h3 class="text-xl font-semibold mb-4">Testing Alerting Functionality</h3>
+                            <div class="code-block">
+                                <pre><code># Run E2E alerting tests
+python3 tests/e2e/test_alerting_e2e.py
+
+# Test alerting service health
+curl http://localhost:8001/health
+
+# List alert policies
+curl -H "Authorization: Bearer test-token" \
+  http://localhost:8001/api/v1/alerts/policies
+
+# List alert providers
+curl -H "Authorization: Bearer test-token" \
+  http://localhost:8001/api/v1/alerts/providers
+
+# List alerts
+curl -H "Authorization: Bearer test-token" \
+  http://localhost:8001/api/v1/alerts/alerts</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Troubleshooting -->
                 <section id="troubleshooting" class="mb-12">
                     <h2 class="text-3xl font-bold text-gray-900 mb-6">Troubleshooting</h2>
@@ -972,6 +1206,7 @@ docker-compose restart api</code></pre>
                         <div class="mt-4 space-x-4">
                             <a href="http://localhost:8000/docs" class="text-blue-600 hover:underline">API Docs</a>
                             <a href="http://localhost:3000" class="text-blue-600 hover:underline">Frontend</a>
+                            <a href="http://localhost:8001/docs" class="text-blue-600 hover:underline">Alerting API</a>
                             <a href="https://github.com/your-org/audit-service" class="text-blue-600 hover:underline">GitHub</a>
                         </div>
                     </div>

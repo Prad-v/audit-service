@@ -12,6 +12,7 @@ app:
     backend: 2
     frontend: 2
     worker: 2
+    alerting: 2
 
 namespace:
   name: audit-service-staging
@@ -52,12 +53,32 @@ worker:
       cpu: 1000m
       memory: 1Gi
 
+alerting:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    ENVIRONMENT: "staging"
+    LOG_LEVEL: "INFO"
+    ALERTING_DATABASE_URL: "postgresql+asyncpg://audit_user:audit_password@postgres-service:5432/alerting_db"
+    ALERTING_API_KEY: "staging-api-key-123"
+
 hpa:
   backend:
     enabled: true
     minReplicas: 2
     maxReplicas: 5
   frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+  alerting:
     enabled: true
     minReplicas: 2
     maxReplicas: 4
@@ -77,6 +98,11 @@ ingress:
           service:
             name: audit-service-backend
             port: 8000
+        - path: /alerts
+          pathType: Prefix
+          service:
+            name: audit-service-alerting
+            port: 8001
 
 resources:
   quota:

@@ -46,4 +46,33 @@ spec:
     name: http
   selector:
     {{- include "audit-service.frontend.selectorLabels" . | nindent 4 }}
+---
+{{- end }}
+{{- if .Values.service.alerting.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "audit-service.fullname" . }}-alerting
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alerting
+  {{- with .Values.service.alerting.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.alerting.type }}
+  ports:
+  - port: {{ .Values.service.alerting.port }}
+    targetPort: {{ .Values.service.alerting.targetPort }}
+    protocol: TCP
+    name: http
+  - port: {{ .Values.alerting.ports.metrics }}
+    targetPort: {{ .Values.alerting.ports.metrics }}
+    protocol: TCP
+    name: metrics
+  selector:
+    {{- include "audit-service.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: alerting
 {{- end }}

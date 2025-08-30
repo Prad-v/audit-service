@@ -56,4 +56,35 @@ spec:
       target:
         type: Utilization
         averageUtilization: {{ .Values.hpa.frontend.targetMemoryUtilizationPercentage }}
+---
+{{- end }}
+{{- if .Values.hpa.alerting.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "audit-service.hpaName" . }}-alerting
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alerting
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "audit-service.fullname" . }}-alerting
+  minReplicas: {{ .Values.hpa.alerting.minReplicas }}
+  maxReplicas: {{ .Values.hpa.alerting.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.hpa.alerting.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.hpa.alerting.targetMemoryUtilizationPercentage }}
 {{- end }}
