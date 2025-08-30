@@ -17,7 +17,7 @@ from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.schemas import AlertPolicy, AlertProvider, Alert, AlertThrottle, AlertSuppression
-from app.models.alert import AlertRule, AlertSeverity, AlertStatus, AlertProviderType
+from app.models.alert import AlertRuleConfig, AlertSeverity, AlertStatus, AlertProviderType
 from app.services.providers import create_provider
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class AlertEngine:
         try:
             # Parse rules from JSON
             rules_data = policy.rules if isinstance(policy.rules, list) else json.loads(policy.rules)
-            rules = [AlertRule(**rule) for rule in rules_data]
+            rules = [AlertRuleConfig(**rule) for rule in rules_data]
             
             # Check time window if configured
             if policy.time_window:
@@ -100,7 +100,7 @@ class AlertEngine:
             logger.error(f"Error evaluating policy {policy.policy_id}: {e}")
             return False
     
-    def _evaluate_rule(self, rule: AlertRule, event_data: Dict[str, Any]) -> bool:
+    def _evaluate_rule(self, rule: AlertRuleConfig, event_data: Dict[str, Any]) -> bool:
         """Evaluate a single rule against event data"""
         try:
             # Get field value from event data

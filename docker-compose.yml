@@ -159,12 +159,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
     container_name: audit-frontend
     ports:
       - "3000:80"
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:3000
     depends_on:
       api:
         condition: service_healthy

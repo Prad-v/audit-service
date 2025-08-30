@@ -67,6 +67,7 @@ class WebhookConfig(ProviderConfig):
     headers: Dict[str, str] = {}
     timeout: int = 30
     retry_count: int = 3
+    verify_ssl: bool = True
 
 
 class EmailConfig(ProviderConfig):
@@ -297,7 +298,12 @@ class WebhookProvider(AlertProvider):
             }
             
             # Send webhook
-            async with httpx.AsyncClient(timeout=config.timeout) as client:
+            # Use verify_ssl from config, or disable for local development
+            verify_ssl = config.verify_ssl
+            if not verify_ssl:
+                # Also disable for local development URLs
+                verify_ssl = not config.url.startswith('http://localhost') and not config.url.startswith('http://127.0.0.1') and not config.url.startswith('http://host.docker.internal')
+            async with httpx.AsyncClient(timeout=config.timeout, verify=verify_ssl) as client:
                 for attempt in range(config.retry_count):
                     try:
                         response = await client.request(

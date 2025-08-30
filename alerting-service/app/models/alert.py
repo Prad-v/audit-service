@@ -7,7 +7,7 @@ This module defines Pydantic models for alert policies, rules, and providers.
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, timedelta
 from enum import Enum
-from pydantic import BaseModel, Field, validator, model_validator
+from pydantic import BaseModel, Field, validator, model_validator, field_validator
 import re
 
 
@@ -230,7 +230,9 @@ class AlertPolicyCreate(BaseModel):
     name: str
     description: Optional[str] = None
     enabled: bool = True
-    rules: List[AlertRuleConfig]
+    rules: List[AlertRuleConfig]  # Keep for backward compatibility
+    # Support for compound rules
+    rule_configs: Optional[List[Dict[str, Any]]] = None  # Flexible rule structure
     match_all: bool = True
     severity: AlertSeverity = AlertSeverity.MEDIUM
     message_template: str
@@ -281,6 +283,8 @@ class AlertResponse(BaseModel):
     title: str
     message: str
     summary: str
+    event_data: Dict[str, Any]
+    event_id: Optional[str]
     triggered_at: datetime
     resolved_at: Optional[datetime]
     acknowledged_at: Optional[datetime]
@@ -362,69 +366,41 @@ class SimpleAlertRuleCreate(BaseModel):
     """Request model for creating simple alert rule"""
     name: str
     description: Optional[str] = None
+    rule_type: str = "simple"
     field: str
     operator: str
     value: Union[str, int, float, bool, List[Any]]
     case_sensitive: bool = True
     enabled: bool = True
 
+    @field_validator('operator')
+    @classmethod
+    def validate_operator(cls, v):
+        valid_operators = ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'not_in', 'contains', 'regex']
+        if v not in valid_operators:
+            raise ValueError(f'Operator must be one of: {valid_operators}')
+        return v
+
 
 class CompoundAlertRuleCreate(BaseModel):
     """Request model for creating compound alert rule"""
     name: str
     description: Optional[str] = None
+    rule_type: str = "compound"
     conditions: List[AlertCondition]
     group_operator: str  # "AND" or "OR"
     enabled: bool = True
 
-
-class AlertRuleCreate(BaseModel):
-    """Request model for creating alert rule"""
-    name: str
-    description: Optional[str] = None
-    rule_type: str = "simple"  # "simple" or "compound"
-    
-    # For simple rules
-    field: Optional[str] = None
-    operator: Optional[str] = None
-    value: Optional[Union[str, int, float, bool, List[Any]]] = None
-    case_sensitive: Optional[bool] = None
-    
-    # For compound rules
-    conditions: Optional[List[AlertCondition]] = None
-    group_operator: Optional[str] = None  # "AND" or "OR"
-    
-    enabled: bool = True
-
-    @model_validator(mode='before')
+    @field_validator('group_operator')
     @classmethod
-    def validate_rule_data(cls, data):
-        """Validate rule data based on type"""
-        if isinstance(data, dict):
-            rule_type = data.get("rule_type", "simple")
-            
-            if rule_type == "simple":
-                # For simple rules, ensure required fields are present
-                if not data.get("field") or not data.get("operator") or data.get("value") is None:
-                    raise ValueError("Simple rules require field, operator, and value")
-            elif rule_type == "compound":
-                # For compound rules, ensure conditions and group_operator are present
-                if not data.get("conditions") or not data.get("group_operator"):
-                    raise ValueError("Compound rules require conditions and group_operator")
-                if data.get("group_operator") not in ["AND", "OR"]:
-                    raise ValueError("Group operator must be 'AND' or 'OR'")
-                # Validate each condition
-                for i, condition in enumerate(data.get("conditions", [])):
-                    if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
-                        raise ValueError(f"Condition {i+1} requires field, operator, and value")
-            else:
-                # Auto-detect rule type
-                if data.get("conditions") and data.get("group_operator"):
-                    data["rule_type"] = "compound"
-                else:
-                    data["rule_type"] = "simple"
-        
-        return data
+    def validate_group_operator(cls, v):
+        if v not in ["AND", "OR"]:
+            raise ValueError("Group operator must be 'AND' or 'OR'")
+        return v
+
+
+# Union type for both rule types
+AlertRuleCreate = Union[SimpleAlertRuleCreate, CompoundAlertRuleCreate]
 
 
 class AlertRuleUpdate(BaseModel):

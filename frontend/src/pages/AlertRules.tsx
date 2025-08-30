@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Filter, Database, X, Plus as PlusIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { alertingApi } from '@/lib/api'
 
 interface AlertCondition {
   field: string
@@ -29,13 +30,8 @@ interface AlertRule {
 interface AlertRuleCreate {
   name: string
   description?: string
-  rule_type: 'simple' | 'compound'
-  field?: string
-  operator?: string
-  value?: string | number | boolean
-  case_sensitive?: boolean
-  conditions?: AlertCondition[]
-  group_operator?: 'AND' | 'OR'
+  conditions: AlertCondition[]
+  group_operator: 'AND' | 'OR'
   enabled: boolean
 }
 
@@ -47,12 +43,12 @@ export function AlertRules() {
   const [formData, setFormData] = useState<AlertRuleCreate>({
     name: '',
     description: '',
-    rule_type: 'simple',
-    field: '',
-    operator: 'eq',
-    value: '',
-    case_sensitive: true,
-    conditions: [],
+    conditions: [{
+      field: '',
+      operator: 'eq',
+      value: '',
+      case_sensitive: true
+    }],
     group_operator: 'AND',
     enabled: true
   })
@@ -119,15 +115,9 @@ export function AlertRules() {
 
   const fetchRules = async () => {
     try {
-      const response = await fetch('/api/v1/alerts/rules', {
-        headers: {
-          'Authorization': 'Bearer test-token'
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setRules(data.rules || [])
-      }
+      setIsLoading(true)
+      const data = await alertingApi.getRules()
+      setRules(data.rules || [])
     } catch (error) {
       console.error('Failed to fetch rules:', error)
     } finally {
@@ -137,49 +127,19 @@ export function AlertRules() {
 
   const handleCreateRule = async () => {
     try {
-      let response
-
-      // For both simple and compound rules, use the main endpoint
       const requestData = {
         name: formData.name,
         description: formData.description,
-        rule_type: formData.rule_type,
+        rule_type: 'compound' as const,
+        conditions: formData.conditions,
+        group_operator: formData.group_operator,
         enabled: formData.enabled
       }
 
-      if (formData.rule_type === 'simple') {
-        // For simple rules, include the single condition fields
-        Object.assign(requestData, {
-          field: formData.field,
-          operator: formData.operator,
-          value: formData.value,
-          case_sensitive: formData.case_sensitive
-        })
-      } else {
-        // For compound rules, include the conditions and group operator
-        Object.assign(requestData, {
-          conditions: formData.conditions,
-          group_operator: formData.group_operator
-        })
-      }
-
-      response = await fetch('/api/v1/alerts/rules', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-token'
-        },
-        body: JSON.stringify(requestData)
-      })
-
-      if (response.ok) {
-        setShowCreateModal(false)
-        resetFormData()
-        fetchRules()
-      } else {
-        const error = await response.text()
-        console.error('Failed to create rule:', error)
-      }
+      await alertingApi.createRule(requestData)
+      setShowCreateModal(false)
+      resetFormData()
+      fetchRules()
     } catch (error) {
       console.error('Failed to create rule:', error)
     }
@@ -189,20 +149,11 @@ export function AlertRules() {
     if (!editingRule) return
     
     try {
-      const response = await fetch(`/api/v1/alerts/rules/${editingRule.rule_id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-token'
-        },
-        body: JSON.stringify(formData)
-      })
-      if (response.ok) {
-        setShowCreateModal(false)
-        setEditingRule(null)
-        resetFormData()
-        fetchRules()
-      }
+      await alertingApi.updateRule(editingRule.rule_id, formData)
+      setShowCreateModal(false)
+      setEditingRule(null)
+      resetFormData()
+      fetchRules()
     } catch (error) {
       console.error('Failed to update rule:', error)
     }
@@ -212,15 +163,8 @@ export function AlertRules() {
     if (!confirm('Are you sure you want to delete this rule?')) return
     
     try {
-      const response = await fetch(`/api/v1/alerts/rules/${ruleId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Bearer test-token'
-        }
-      })
-      if (response.ok) {
-        fetchRules()
-      }
+      await alertingApi.deleteRule(ruleId)
+      fetchRules()
     } catch (error) {
       console.error('Failed to delete rule:', error)
     }
@@ -231,12 +175,12 @@ export function AlertRules() {
     setFormData({
       name: rule.name,
       description: rule.description || '',
-      rule_type: (rule.rule_type as 'simple' | 'compound') || 'simple',
-      field: rule.field || '',
-      operator: rule.operator || 'eq',
-      value: rule.value || '',
-      case_sensitive: rule.case_sensitive || true,
-      conditions: rule.conditions || [],
+      conditions: rule.conditions || [{
+        field: '',
+        operator: 'eq',
+        value: '',
+        case_sensitive: true
+      }],
       group_operator: (rule.group_operator as 'AND' | 'OR') || 'AND',
       enabled: rule.enabled
     })
@@ -247,31 +191,18 @@ export function AlertRules() {
     setFormData({
       name: '',
       description: '',
-      rule_type: 'simple',
-      field: '',
-      operator: 'eq',
-      value: '',
-      case_sensitive: true,
-      conditions: [],
+      conditions: [{
+        field: '',
+        operator: 'eq',
+        value: '',
+        case_sensitive: true
+      }],
       group_operator: 'AND',
       enabled: true
     })
   }
 
-  const getOperatorLabel = (operator: string) => {
-    const op = operators.find(o => o.value === operator)
-    return op ? op.label : operator
-  }
 
-  const formatValue = (value: any) => {
-    if (typeof value === 'boolean') {
-      return value ? 'true' : 'false'
-    }
-    if (Array.isArray(value)) {
-      return value.join(', ')
-    }
-    return String(value)
-  }
 
   if (isLoading) {
     return (
@@ -323,20 +254,9 @@ export function AlertRules() {
                     )}
                     <div className="flex items-center mt-2 text-xs text-gray-500">
                       <Database className="w-3 h-3 mr-1" />
-                      {rule.rule_type === 'simple' ? (
-                        <>
-                          {rule.field} {getOperatorLabel(rule.operator || '')} {formatValue(rule.value)}
-                          {rule.case_sensitive && (
-                            <span className="ml-2 text-blue-600">Case Sensitive</span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-purple-600 font-medium">Compound Rule</span>
-                          <span className="ml-2">({rule.group_operator})</span>
-                          <span className="ml-2">{rule.conditions?.length || 0} conditions</span>
-                        </>
-                      )}
+                      <span className="text-purple-600 font-medium">Compound Rule</span>
+                      <span className="ml-2">({rule.group_operator || 'AND'})</span>
+                      <span className="ml-2">{rule.conditions?.length || 0} conditions</span>
                     </div>
                   </div>
                 </div>
@@ -409,70 +329,7 @@ export function AlertRules() {
                     rows={2}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Rule Type</label>
-                  <select
-                    value={formData.rule_type}
-                    onChange={(e) => setFormData({ ...formData, rule_type: e.target.value as 'simple' | 'compound' })}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="simple">Simple Rule (Single Condition)</option>
-                    <option value="compound">Compound Rule (Multiple Conditions)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Field</label>
-                  <select
-                    value={formData.field}
-                    onChange={(e) => setFormData({ ...formData, field: e.target.value })}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">Select a field</option>
-                    {commonFields.map(field => (
-                      <option key={field} value={field}>{field}</option>
-                    ))}
-                    <option value="custom">Custom Field</option>
-                  </select>
-                  {formData.field === 'custom' && (
-                    <input
-                      type="text"
-                      placeholder="Enter custom field name"
-                      onChange={(e) => setFormData({ ...formData, field: e.target.value })}
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Operator</label>
-                  <select
-                    value={formData.operator}
-                    onChange={(e) => setFormData({ ...formData, operator: e.target.value })}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    {operators.map(op => (
-                      <option key={op.value} value={op.value}>{op.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Value</label>
-                  <input
-                    type="text"
-                    value={String(formData.value)}
-                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                    placeholder="Enter value to compare against"
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.case_sensitive}
-                    onChange={(e) => setFormData({ ...formData, case_sensitive: e.target.checked })}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label className="ml-2 block text-sm text-gray-900">Case Sensitive</label>
-                </div>
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -483,21 +340,19 @@ export function AlertRules() {
                   <label className="ml-2 block text-sm text-gray-900">Enabled</label>
                 </div>
 
-                {/* Compound Rule Fields */}
-                {formData.rule_type === 'compound' && (
-                  <>
-                    <div className="border-t pt-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-medium text-gray-900">Conditions</h4>
-                        <button
-                          type="button"
-                          onClick={addCondition}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200"
-                        >
-                          <PlusIcon className="w-3 h-3 mr-1" />
-                          Add Condition
-                        </button>
-                      </div>
+                {/* Rule Conditions */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-medium text-gray-900">Conditions</h4>
+                    <button
+                      type="button"
+                      onClick={addCondition}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200"
+                    >
+                      <PlusIcon className="w-3 h-3 mr-1" />
+                      Add Condition
+                    </button>
+                  </div>
                       
                       <div className="space-y-3">
                         {formData.conditions?.map((condition, index) => (
@@ -576,8 +431,6 @@ export function AlertRules() {
                         </div>
                       )}
                     </div>
-                  </>
-                )}
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button

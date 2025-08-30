@@ -40,13 +40,21 @@ async def create_alert_policy(
         # Generate policy ID
         policy_id = f"policy-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
         
+        # Handle rules - support both simple and compound rules
+        if policy_data.rule_configs:
+            # Use flexible rule configs for compound rules
+            rules_data = policy_data.rule_configs
+        else:
+            # Convert simple rules to the format expected by the database
+            rules_data = [rule.dict() for rule in policy_data.rules]
+        
         # Create policy
         policy = AlertPolicy(
             policy_id=policy_id,
             name=policy_data.name,
             description=policy_data.description,
             enabled=policy_data.enabled,
-            rules=policy_data.rules,
+            rules=rules_data,
             match_all=policy_data.match_all,
             severity=policy_data.severity,
             message_template=policy_data.message_template,
@@ -637,52 +645,59 @@ async def create_simple_alert_rule(
 
 @router.post("/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert_rule(
-    rule_data: dict,
+    request: Request,
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new alert rule (legacy endpoint)"""
+    """Create a new alert rule"""
     try:
+        # Get raw JSON data
+        rule_data = await request.json()
+        
         # Generate rule ID
         rule_id = f"rule-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user[:8]}"
         
-        # Validate rule data based on type
+        # Validate based on rule type
         rule_type = rule_data.get("rule_type", "simple")
-        if rule_type == "simple":
-            if not rule_data.get("field") or not rule_data.get("operator") or rule_data.get("value") is None:
-                raise HTTPException(status_code=400, detail="Simple rules require field, operator, and value")
-        elif rule_type == "compound":
-            if not rule_data.get("conditions") or not rule_data.get("group_operator"):
-                raise HTTPException(status_code=400, detail="Compound rules require conditions and group_operator")
-            if rule_data.get("group_operator") not in ["AND", "OR"]:
-                raise HTTPException(status_code=400, detail="Group operator must be 'AND' or 'OR'")
-            # Validate that each condition has required fields
-            for i, condition in enumerate(rule_data.get("conditions", [])):
-                if not condition.get("field") or not condition.get("operator") or condition.get("value") is None:
-                    raise HTTPException(status_code=400, detail=f"Condition {i+1} requires field, operator, and value")
-        else:
-            # Auto-detect rule type based on presence of conditions
-            if rule_data.get("conditions") and rule_data.get("group_operator"):
-                rule_type = "compound"
-            else:
-                rule_type = "simple"
         
-        # Create rule
-        rule = AlertRule(
-            rule_id=rule_id,
-            name=rule_data.get("name"),
-            description=rule_data.get("description"),
-            rule_type=rule_type,
-            field=rule_data.get("field"),
-            operator=rule_data.get("operator"),
-            value=str(rule_data.get("value")) if rule_data.get("value") is not None else None,
-            case_sensitive=rule_data.get("case_sensitive"),
-            conditions=rule_data.get("conditions"),
-            group_operator=rule_data.get("group_operator"),
-            enabled=rule_data.get("enabled", True),
-            tenant_id="default",  # TODO: Get from user context
-            created_by=current_user
-        )
+        if rule_type == "simple":
+            # Validate simple rule
+            simple_rule = SimpleAlertRuleCreate(**rule_data)
+            rule = AlertRule(
+                rule_id=rule_id,
+                name=simple_rule.name,
+                description=simple_rule.description,
+                rule_type=simple_rule.rule_type,
+                field=simple_rule.field,
+                operator=simple_rule.operator,
+                value=str(simple_rule.value),
+                case_sensitive=simple_rule.case_sensitive,
+                conditions=None,
+                group_operator=None,
+                enabled=simple_rule.enabled,
+                tenant_id="default",
+                created_by=current_user
+            )
+        elif rule_type == "compound":
+            # Validate compound rule
+            compound_rule = CompoundAlertRuleCreate(**rule_data)
+            rule = AlertRule(
+                rule_id=rule_id,
+                name=compound_rule.name,
+                description=compound_rule.description,
+                rule_type=compound_rule.rule_type,
+                field=None,
+                operator=None,
+                value=None,
+                case_sensitive=None,
+                conditions=[condition.dict() for condition in compound_rule.conditions],
+                group_operator=compound_rule.group_operator,
+                enabled=compound_rule.enabled,
+                tenant_id="default",
+                created_by=current_user
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid rule type")
         
         db.add(rule)
         await db.commit()

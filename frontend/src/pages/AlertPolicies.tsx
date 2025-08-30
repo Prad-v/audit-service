@@ -152,18 +152,47 @@ export function AlertPolicies() {
 
   const handleCreatePolicy = async () => {
     try {
+      // Convert selected rules to the format expected by the backend
+      const ruleConfigs = formData.rules.map(rule => {
+        if (rule.rule_type === 'compound') {
+          // For compound rules, send the full rule structure
+          return {
+            rule_type: 'compound',
+            conditions: rule.conditions,
+            group_operator: rule.group_operator
+          }
+        } else {
+          // For simple rules, send the simple format
+          return {
+            field: rule.field,
+            operator: rule.operator,
+            value: rule.value,
+            case_sensitive: rule.case_sensitive
+          }
+        }
+      })
+
+      const requestData = {
+        ...formData,
+        rule_configs: ruleConfigs,
+        rules: [] // Clear the rules array since we're using rule_configs
+      }
+
       const response = await fetch('/api/v1/alerts/policies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-token'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(requestData)
       })
       if (response.ok) {
         setShowCreateModal(false)
         resetForm()
         fetchPolicies()
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to create policy:', errorData)
       }
     } catch (error) {
       console.error('Failed to create policy:', error)
@@ -174,19 +203,48 @@ export function AlertPolicies() {
     if (!editingPolicy) return
     
     try {
+      // Convert selected rules to the format expected by the backend
+      const ruleConfigs = formData.rules.map(rule => {
+        if (rule.rule_type === 'compound') {
+          // For compound rules, send the full rule structure
+          return {
+            rule_type: 'compound',
+            conditions: rule.conditions,
+            group_operator: rule.group_operator
+          }
+        } else {
+          // For simple rules, send the simple format
+          return {
+            field: rule.field,
+            operator: rule.operator,
+            value: rule.value,
+            case_sensitive: rule.case_sensitive
+          }
+        }
+      })
+
+      const requestData = {
+        ...formData,
+        rule_configs: ruleConfigs,
+        rules: [] // Clear the rules array since we're using rule_configs
+      }
+
       const response = await fetch(`/api/v1/alerts/policies/${editingPolicy.policy_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-token'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(requestData)
       })
       if (response.ok) {
         setShowCreateModal(false)
         setEditingPolicy(null)
         resetForm()
         fetchPolicies()
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to update policy:', errorData)
       }
     } catch (error) {
       console.error('Failed to update policy:', error)
