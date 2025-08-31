@@ -26,6 +26,8 @@ from app.models.audit import (
     AuditEventQuery,
     AuditEventQueryResponse,
     PaginatedResponse,
+    DynamicFilter,
+    DynamicFilterGroup,
 )
 from app.models.metrics import (
     MetricsData,
@@ -190,7 +192,7 @@ async def get_audit_events(
     # Pagination parameters
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(50, ge=1, le=1000, description="Page size"),
-    # Filtering parameters
+    # Standard filtering parameters
     start_date: Optional[datetime] = Query(None, description="Start date filter"),
     end_date: Optional[datetime] = Query(None, description="End date filter"),
     event_types: Optional[List[str]] = Query(None, description="Event type filters"),
@@ -203,6 +205,9 @@ async def get_audit_events(
     session_ids: Optional[List[str]] = Query(None, description="Session ID filters"),
     correlation_ids: Optional[List[str]] = Query(None, description="Correlation ID filters"),
     search: Optional[str] = Query(None, description="Search term"),
+    # Dynamic filtering parameters
+    dynamic_filters: Optional[str] = Query(None, description="JSON string of dynamic filters"),
+    filter_groups: Optional[str] = Query(None, description="JSON string of filter groups"),
     # Sorting parameters
     sort_by: Optional[str] = Query("timestamp", description="Sort field"),
     sort_order: SortOrder = Query(SortOrder.DESC, description="Sort order"),
@@ -218,6 +223,38 @@ async def get_audit_events(
     try:
         user_id, tenant_id, _, _ = get_current_user(request)
         
+        # Parse dynamic filters from JSON strings
+        parsed_dynamic_filters = None
+        parsed_filter_groups = None
+        
+        if dynamic_filters:
+            try:
+                import json
+                dynamic_filters_data = json.loads(dynamic_filters)
+                if isinstance(dynamic_filters_data, list):
+                    parsed_dynamic_filters = [DynamicFilter(**filter_data) for filter_data in dynamic_filters_data]
+                else:
+                    parsed_dynamic_filters = [DynamicFilter(**dynamic_filters_data)]
+            except (json.JSONDecodeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid dynamic_filters JSON: {str(e)}"
+                )
+        
+        if filter_groups:
+            try:
+                import json
+                filter_groups_data = json.loads(filter_groups)
+                if isinstance(filter_groups_data, list):
+                    parsed_filter_groups = [DynamicFilterGroup(**group_data) for group_data in filter_groups_data]
+                else:
+                    parsed_filter_groups = [DynamicFilterGroup(**filter_groups_data)]
+            except (json.JSONDecodeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid filter_groups JSON: {str(e)}"
+                )
+        
         # Build query parameters
         query = AuditEventQuery(
             start_time=start_date,
@@ -231,6 +268,8 @@ async def get_audit_events(
             ip_address=ip_addresses[0] if ip_addresses else None,
             session_id=session_ids[0] if session_ids else None,
             correlation_id=correlation_ids[0] if correlation_ids else None,
+            dynamic_filters=parsed_dynamic_filters,
+            filter_groups=parsed_filter_groups,
             sort_by=sort_by,
             sort_order=sort_order,
         )
@@ -331,7 +370,7 @@ async def export_audit_events(
     request: Request,
     # Export parameters
     format: str = Query("json", regex="^(json|csv)$", description="Export format"),
-    # Filtering parameters (same as query)
+    # Standard filtering parameters
     start_date: Optional[datetime] = Query(None, description="Start date filter"),
     end_date: Optional[datetime] = Query(None, description="End date filter"),
     event_types: Optional[List[str]] = Query(None, description="Event type filters"),
@@ -344,6 +383,9 @@ async def export_audit_events(
     session_ids: Optional[List[str]] = Query(None, description="Session ID filters"),
     correlation_ids: Optional[List[str]] = Query(None, description="Correlation ID filters"),
     search: Optional[str] = Query(None, description="Search term"),
+    # Dynamic filtering parameters
+    dynamic_filters: Optional[str] = Query(None, description="JSON string of dynamic filters"),
+    filter_groups: Optional[str] = Query(None, description="JSON string of filter groups"),
     # Sorting parameters
     sort_by: Optional[str] = Query("timestamp", description="Sort field"),
     sort_order: SortOrder = Query(SortOrder.DESC, description="Sort order"),
@@ -360,6 +402,38 @@ async def export_audit_events(
     try:
         user_id, tenant_id, _, _ = get_current_user(request)
         
+        # Parse dynamic filters from JSON strings
+        parsed_dynamic_filters = None
+        parsed_filter_groups = None
+        
+        if dynamic_filters:
+            try:
+                import json
+                dynamic_filters_data = json.loads(dynamic_filters)
+                if isinstance(dynamic_filters_data, list):
+                    parsed_dynamic_filters = [DynamicFilter(**filter_data) for filter_data in dynamic_filters_data]
+                else:
+                    parsed_dynamic_filters = [DynamicFilter(**dynamic_filters_data)]
+            except (json.JSONDecodeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid dynamic_filters JSON: {str(e)}"
+                )
+        
+        if filter_groups:
+            try:
+                import json
+                filter_groups_data = json.loads(filter_groups)
+                if isinstance(filter_groups_data, list):
+                    parsed_filter_groups = [DynamicFilterGroup(**group_data) for group_data in filter_groups_data]
+                else:
+                    parsed_filter_groups = [DynamicFilterGroup(**filter_groups_data)]
+            except (json.JSONDecodeError, ValueError) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid filter_groups JSON: {str(e)}"
+                )
+        
         # Build query parameters
         query = AuditEventQuery(
             start_time=start_date,
@@ -373,6 +447,8 @@ async def export_audit_events(
             ip_address=ip_addresses[0] if ip_addresses else None,
             session_id=session_ids[0] if session_ids else None,
             correlation_id=correlation_ids[0] if correlation_ids else None,
+            dynamic_filters=parsed_dynamic_filters,
+            filter_groups=parsed_filter_groups,
             sort_by=sort_by,
             sort_order=sort_order,
         )
@@ -715,3 +791,45 @@ async def get_system_metrics(request: Request):
         )
 
 
+@router.get("/filters/info")
+@require_permission(Permission.READ_AUDIT)
+async def get_filter_info(request: Request):
+    """
+    Get information about available fields and operators for dynamic filtering.
+    
+    This endpoint provides metadata about the available fields that can be used
+    for dynamic filtering, along with supported operators and example filters.
+    
+    **Required Permission**: AUDIT_READ
+    """
+    try:
+        from app.services.dynamic_filter_service import dynamic_filter_service
+        
+        return {
+            "available_fields": dynamic_filter_service.get_available_fields(),
+            "supported_operators": dynamic_filter_service.get_supported_operators(),
+            "examples": dynamic_filter_service.create_filter_examples(),
+            "field_mappings": {
+                "standard_fields": [
+                    "audit_id", "timestamp", "event_type", "action", "status",
+                    "tenant_id", "service_name", "user_id", "resource_type", 
+                    "resource_id", "correlation_id", "session_id", "ip_address",
+                    "user_agent", "created_at", "updated_at"
+                ],
+                "json_fields": [
+                    "request_data", "response_data", "metadata"
+                ],
+                "nested_json_examples": [
+                    "request_data.method", "request_data.path", "request_data.headers",
+                    "response_data.status_code", "response_data.body",
+                    "metadata.user_id", "metadata.session_id", "metadata.login_method"
+                ]
+            }
+        }
+        
+    except Exception as e:
+        logger.error("Failed to get filter info", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )

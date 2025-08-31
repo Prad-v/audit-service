@@ -154,30 +154,26 @@ services:
       - audit-network
     restart: unless-stopped
 
-  # React Frontend (Production)
+  # React Frontend (Development)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:3000
+      dockerfile: Dockerfile.dev
     container_name: audit-frontend
     ports:
-      - "3000:80"
+      - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - VITE_API_URL=http://localhost:3000
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       api:
         condition: service_healthy
     networks:
       - audit-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Alerting Service
   alerting:

@@ -33,6 +33,7 @@ from app.models.audit import (
 from app.models.base import PaginationParams, SortOrder
 from app.services.nats_service import get_nats_service
 from app.services.cache_service import get_cache_service
+from app.services.dynamic_filter_service import dynamic_filter_service
 from app.utils.metrics import audit_metrics
 
 logger = structlog.get_logger(__name__)
@@ -525,7 +526,13 @@ class AuditService:
         if query.correlation_id:
             stmt = stmt.where(AuditLog.correlation_id == query.correlation_id)
         
-        # Search functionality removed - not part of AuditEventQuery model
+        # Apply dynamic filters
+        if query.dynamic_filters:
+            stmt = dynamic_filter_service.apply_dynamic_filters(stmt, query.dynamic_filters)
+        
+        # Apply filter groups
+        if query.filter_groups:
+            stmt = dynamic_filter_service.apply_filter_groups(stmt, query.filter_groups)
         
         return stmt
     

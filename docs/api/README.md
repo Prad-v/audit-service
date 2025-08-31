@@ -2,59 +2,30 @@
 
 ## Overview
 
-The Audit Service API provides a comprehensive audit logging system with RESTful endpoints for creating, retrieving, and querying audit events. The API is built with FastAPI and provides automatic OpenAPI documentation.
+The Audit Service API provides comprehensive audit logging capabilities with support for creating, querying, and exporting audit events. The API includes advanced filtering, dynamic field querying, and multi-tenant support.
 
 ## Base URL
 
 - **Development**: `http://localhost:8000`
-- **Production**: `https://your-domain.com`
+- **Production**: `https://your-domain.com/api`
 
 ## Authentication
 
-The API supports multiple authentication methods:
+All API endpoints require authentication using JWT tokens or API keys.
 
-### 1. JWT Tokens
-```bash
+### Headers
+```
 Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
 ```
 
-### 2. API Keys
-```bash
-X-API-Key: <your-api-key>
-```
-
-### 3. RBAC Disabled (Development)
-For development and testing, RBAC can be disabled using environment variables:
-- `RBAC_AUTHENTICATION_DISABLED=true`
-- `RBAC_AUTHORIZATION_DISABLED=true`
-
-## Health Check
-
-### GET /health/
-
-Check the health status of the API and its dependencies.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "version": "1.0.0",
-  "services": {
-    "database": "healthy",
-    "redis": "healthy",
-    "nats": "healthy"
-  }
-}
-```
-
-## Audit Events
+## Endpoints
 
 ### Create Audit Event
 
 **POST** `/api/v1/audit/events`
 
-Create a single audit event.
+Create a single audit log event.
 
 **Request Body:**
 ```json
@@ -122,7 +93,7 @@ Create a single audit event.
 
 **POST** `/api/v1/audit/events/batch`
 
-Create multiple audit events in a single request.
+Create multiple audit log events in a single request.
 
 **Request Body:**
 ```json
@@ -132,50 +103,16 @@ Create multiple audit events in a single request.
       "event_type": "user_login",
       "action": "login",
       "status": "success",
-      "tenant_id": "tenant_123",
-      "service_name": "auth_service",
-      "user_id": "user_456"
+      "user_id": "user_123"
     },
     {
       "event_type": "data_access",
       "action": "read",
       "status": "success",
-      "tenant_id": "tenant_123",
-      "service_name": "data_service",
-      "user_id": "user_456",
-      "resource_type": "document",
-      "resource_id": "doc_789"
+      "user_id": "user_456"
     }
   ]
 }
-```
-
-**Response:**
-```json
-[
-  {
-    "audit_id": "550e8400-e29b-41d4-a716-446655440000",
-    "event_type": "user_login",
-    "action": "login",
-    "status": "success",
-    "tenant_id": "tenant_123",
-    "service_name": "auth_service",
-    "user_id": "user_456",
-    "timestamp": "2024-01-15T10:30:00Z"
-  },
-  {
-    "audit_id": "550e8400-e29b-41d4-a716-446655440001",
-    "event_type": "data_access",
-    "action": "read",
-    "status": "success",
-    "tenant_id": "tenant_123",
-    "service_name": "data_service",
-    "user_id": "user_456",
-    "resource_type": "document",
-    "resource_id": "doc_789",
-    "timestamp": "2024-01-15T10:30:01Z"
-  }
-]
 ```
 
 ### Get Audit Event
@@ -223,24 +160,37 @@ Retrieve a specific audit event by ID.
 
 Query audit events with filtering, sorting, and pagination.
 
-**Query Parameters:**
+#### Standard Query Parameters
+
 - `page` (int): Page number (default: 1)
 - `size` (int): Page size (default: 50, max: 1000)
+- `start_date` (datetime): Start date filter (ISO 8601 format)
+- `end_date` (datetime): End date filter (ISO 8601 format)
 - `event_types` (string): Comma-separated list of event types
-- `status` (string): Event status (success, failure, warning)
-- `tenant_id` (string): Tenant ID filter
-- `service_name` (string): Service name filter
-- `user_id` (string): User ID filter
-- `resource_type` (string): Resource type filter
-- `resource_id` (string): Resource ID filter
-- `start_time` (string): Start time (ISO 8601 format)
-- `end_time` (string): End time (ISO 8601 format)
+- `resource_types` (string): Comma-separated list of resource types
+- `resource_ids` (string): Comma-separated list of resource IDs
+- `actions` (string): Comma-separated list of actions
+- `severities` (string): Comma-separated list of severities
+- `user_ids` (string): Comma-separated list of user IDs
+- `ip_addresses` (string): Comma-separated list of IP addresses
+- `session_ids` (string): Comma-separated list of session IDs
+- `correlation_ids` (string): Comma-separated list of correlation IDs
 - `sort_by` (string): Sort field (timestamp, created_at, event_type)
 - `sort_order` (string): Sort order (asc, desc)
 
-**Example Request:**
+#### Dynamic Filtering Parameters
+
+- `dynamic_filters` (string): JSON string of dynamic filters
+- `filter_groups` (string): JSON string of filter groups
+
+**Example Request with Standard Filters:**
 ```
 GET /api/v1/audit/events?page=1&size=10&event_types=user_login,data_access&status=success&start_time=2024-01-01T00:00:00Z&end_time=2024-01-15T23:59:59Z&sort_by=timestamp&sort_order=desc
+```
+
+**Example Request with Dynamic Filters:**
+```
+GET /api/v1/audit/events?dynamic_filters=[{"field":"event_type","operator":"eq","value":"user_login"},{"field":"metadata.user_id","operator":"contains","value":"admin"}]&filter_groups=[{"filters":[{"field":"status","operator":"ne","value":"success"},{"field":"ip_address","operator":"starts_with","value":"192.168"}],"operator":"AND"}]
 ```
 
 **Response:**
@@ -255,168 +205,426 @@ GET /api/v1/audit/events?page=1&size=10&event_types=user_login,data_access&statu
       "tenant_id": "tenant_123",
       "service_name": "auth_service",
       "user_id": "user_456",
-      "timestamp": "2024-01-15T10:30:00Z"
+      "resource_type": "user",
+      "resource_id": "user_456",
+      "ip_address": "192.168.1.100",
+      "user_agent": "Mozilla/5.0...",
+      "request_data": {
+        "method": "POST",
+        "path": "/login",
+        "headers": {}
+      },
+      "response_data": {
+        "status_code": 200,
+        "body": {}
+      },
+      "metadata": {
+        "session_id": "sess_789",
+        "login_method": "password"
+      },
+      "timestamp": "2024-01-15T10:30:00Z",
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-15T10:30:00Z"
     }
   ],
-  "total_count": 150,
+  "total_count": 1,
   "page": 1,
-  "page_size": 10,
-  "total_pages": 15,
-  "has_next": true,
+  "page_size": 50,
+  "total_pages": 1,
+  "has_next": false,
   "has_previous": false
 }
 ```
 
-### Export Audit Events
+### Get Filter Information
 
-**GET** `/api/v1/audit/events/export`
+**GET** `/api/v1/audit/filters/info`
 
-Export audit events in various formats.
-
-**Query Parameters:**
-- Same as query endpoint
-- `format` (string): Export format (json, csv, xlsx)
-
-**Response:**
-- JSON: Same as query endpoint
-- CSV: Comma-separated values file
-- XLSX: Excel file
-
-### Get Audit Summary
-
-**GET** `/api/v1/audit/summary`
-
-Get summary statistics for audit events.
-
-**Query Parameters:**
-- Same as query endpoint (except pagination)
+Get information about available fields and operators for dynamic filtering.
 
 **Response:**
 ```json
 {
-  "total_events": 1500,
-  "events_by_type": {
-    "user_login": 500,
-    "data_access": 300,
-    "system_event": 200
-  },
-  "events_by_status": {
-    "success": 1400,
-    "failure": 80,
-    "warning": 20
-  },
-  "events_by_service": {
-    "auth_service": 500,
-    "data_service": 300,
-    "system_service": 200
-  },
-  "time_range": {
-    "start_time": "2024-01-01T00:00:00Z",
-    "end_time": "2024-01-15T23:59:59Z"
-  }
-}
-```
-
-## Error Responses
-
-### Standard Error Format
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request data",
-    "details": [
-      {
-        "field": "event_type",
-        "message": "Field is required"
-      }
+  "available_fields": [
+    "audit_id",
+    "timestamp",
+    "event_type",
+    "action",
+    "status",
+    "tenant_id",
+    "service_name",
+    "user_id",
+    "resource_type",
+    "resource_id",
+    "correlation_id",
+    "session_id",
+    "ip_address",
+    "user_agent",
+    "created_at",
+    "updated_at",
+    "request_data",
+    "response_data",
+    "metadata",
+    "request_data.method",
+    "request_data.path",
+    "request_data.headers",
+    "response_data.status_code",
+    "response_data.body",
+    "metadata.user_id",
+    "metadata.session_id",
+    "metadata.login_method"
+  ],
+  "supported_operators": [
+    "eq",
+    "ne",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "in",
+    "not_in",
+    "contains",
+    "not_contains",
+    "starts_with",
+    "ends_with",
+    "is_null",
+    "is_not_null",
+    "regex"
+  ],
+  "examples": [
+    {
+      "field": "event_type",
+      "operator": "eq",
+      "value": "user_login",
+      "description": "Find all user login events"
+    },
+    {
+      "field": "status",
+      "operator": "ne",
+      "value": "success",
+      "description": "Find all non-success events"
+    },
+    {
+      "field": "timestamp",
+      "operator": "gte",
+      "value": "2024-01-01T00:00:00Z",
+      "description": "Find events from 2024 onwards"
+    },
+    {
+      "field": "metadata.user_id",
+      "operator": "contains",
+      "value": "admin",
+      "description": "Find events with admin in user_id metadata"
+    },
+    {
+      "field": "request_data.method",
+      "operator": "in",
+      "value": ["POST", "PUT", "DELETE"],
+      "description": "Find events with write operations"
+    },
+    {
+      "field": "ip_address",
+      "operator": "starts_with",
+      "value": "192.168",
+      "description": "Find events from internal network"
+    },
+    {
+      "field": "response_data.status_code",
+      "operator": "gte",
+      "value": 400,
+      "description": "Find events with error status codes"
+    }
+  ],
+  "field_mappings": {
+    "standard_fields": [
+      "audit_id",
+      "timestamp",
+      "event_type",
+      "action",
+      "status",
+      "tenant_id",
+      "service_name",
+      "user_id",
+      "resource_type",
+      "resource_id",
+      "correlation_id",
+      "session_id",
+      "ip_address",
+      "user_agent",
+      "created_at",
+      "updated_at"
+    ],
+    "json_fields": [
+      "request_data",
+      "response_data",
+      "metadata"
+    ],
+    "nested_json_examples": [
+      "request_data.method",
+      "request_data.path",
+      "request_data.headers",
+      "response_data.status_code",
+      "response_data.body",
+      "metadata.user_id",
+      "metadata.session_id",
+      "metadata.login_method"
     ]
   }
 }
 ```
 
-### Common Error Codes
-- `VALIDATION_ERROR`: Request validation failed
-- `NOT_FOUND`: Resource not found
-- `UNAUTHORIZED`: Authentication required
-- `FORBIDDEN`: Insufficient permissions
-- `INTERNAL_ERROR`: Server error
+## Dynamic Filtering
 
-## Rate Limiting
+The API supports dynamic filtering on any field with flexible operators. This allows you to query audit events using complex conditions without predefined filter parameters.
 
-The API implements rate limiting to prevent abuse:
-- **Default**: 100 requests per minute per IP
-- **Authenticated**: 1000 requests per minute per user
-- **Headers**: Rate limit information is included in response headers
+### Dynamic Filter Structure
 
-## WebSocket Events
-
-### Audit Event Stream
-
-**WebSocket** `/ws/audit/events`
-
-Subscribe to real-time audit events.
-
-**Message Format:**
 ```json
 {
-  "type": "audit_event",
-  "data": {
-    "audit_id": "550e8400-e29b-41d4-a716-446655440000",
-    "event_type": "user_login",
-    "action": "login",
-    "status": "success",
-    "timestamp": "2024-01-15T10:30:00Z"
-  }
+  "field": "string",           // Field name to filter on
+  "operator": "string",        // Filter operator
+  "value": "any",              // Filter value (not required for is_null/is_not_null)
+  "case_sensitive": "boolean"  // Case sensitive matching (default: true)
 }
 ```
 
-## SDKs and Libraries
+### Supported Operators
 
-### Python
-```bash
-pip install audit-service-sdk
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `eq` | Equals | `{"field": "event_type", "operator": "eq", "value": "user_login"}` |
+| `ne` | Not equals | `{"field": "status", "operator": "ne", "value": "success"}` |
+| `gt` | Greater than | `{"field": "timestamp", "operator": "gt", "value": "2024-01-01T00:00:00Z"}` |
+| `gte` | Greater than or equal | `{"field": "response_data.status_code", "operator": "gte", "value": 400}` |
+| `lt` | Less than | `{"field": "timestamp", "operator": "lt", "value": "2024-01-15T23:59:59Z"}` |
+| `lte` | Less than or equal | `{"field": "response_data.status_code", "operator": "lte", "value": 299}` |
+| `in` | In list | `{"field": "event_type", "operator": "in", "value": ["user_login", "user_logout"]}` |
+| `not_in` | Not in list | `{"field": "event_type", "operator": "not_in", "value": ["system_event"]}` |
+| `contains` | Contains substring | `{"field": "metadata.user_id", "operator": "contains", "value": "admin"}` |
+| `not_contains` | Does not contain | `{"field": "user_agent", "operator": "not_contains", "value": "bot"}` |
+| `starts_with` | Starts with | `{"field": "ip_address", "operator": "starts_with", "value": "192.168"}` |
+| `ends_with` | Ends with | `{"field": "user_id", "operator": "ends_with", "value": "admin"}` |
+| `is_null` | Is null | `{"field": "correlation_id", "operator": "is_null"}` |
+| `is_not_null` | Is not null | `{"field": "session_id", "operator": "is_not_null"}` |
+| `regex` | Regular expression | `{"field": "ip_address", "operator": "regex", "value": "^192\\.168\\."}` |
+
+### Filter Groups
+
+You can group multiple filters with logical operators (AND/OR):
+
+```json
+{
+  "filters": [
+    {
+      "field": "event_type",
+      "operator": "eq",
+      "value": "user_login"
+    },
+    {
+      "field": "status",
+      "operator": "eq",
+      "value": "failed"
+    }
+  ],
+  "operator": "AND"
+}
 ```
 
-```python
-from audit_service import AuditClient
+### Nested JSON Field Access
 
-client = AuditClient(api_key="your-api-key")
-event = client.create_event(
-    event_type="user_login",
-    action="login",
-    status="success",
-    user_id="user_123"
+You can filter on nested JSON fields using dot notation:
+
+```json
+{
+  "field": "request_data.method",
+  "operator": "in",
+  "value": ["POST", "PUT", "DELETE"]
+}
+```
+
+```json
+{
+  "field": "metadata.user_id",
+  "operator": "contains",
+  "value": "admin"
+}
+```
+
+### Complex Filter Examples
+
+#### Find failed login attempts from internal network
+```json
+[
+  {
+    "field": "event_type",
+    "operator": "eq",
+    "value": "user_login"
+  },
+  {
+    "field": "status",
+    "operator": "eq",
+    "value": "failed"
+  },
+  {
+    "field": "ip_address",
+    "operator": "starts_with",
+    "value": "192.168"
+  }
+]
+```
+
+#### Find events with error status codes
+```json
+[
+  {
+    "field": "response_data.status_code",
+    "operator": "gte",
+    "value": 400
+  }
+]
+```
+
+#### Find admin user activities
+```json
+[
+  {
+    "field": "metadata.user_id",
+    "operator": "contains",
+    "value": "admin"
+  }
+]
+```
+
+#### Find events with missing correlation IDs
+```json
+[
+  {
+    "field": "correlation_id",
+    "operator": "is_null"
+  }
+]
+```
+
+#### Complex filter group (OR condition)
+```json
+[
+  {
+    "filters": [
+      {
+        "field": "event_type",
+        "operator": "eq",
+        "value": "user_login"
+      },
+      {
+        "field": "event_type",
+        "operator": "eq",
+        "value": "user_logout"
+      }
+    ],
+    "operator": "OR"
+  }
+]
+```
+
+## Export Audit Events
+
+**GET** `/api/v1/audit/events/export`
+
+Export audit events in CSV or JSON format with the same filtering capabilities as the query endpoint.
+
+**Query Parameters:**
+- `format` (string): Export format - "json" or "csv" (default: "json")
+- All standard and dynamic filtering parameters supported
+
+**Example Request:**
+```
+GET /api/v1/audit/events/export?format=csv&start_date=2024-01-01T00:00:00Z&end_date=2024-01-15T23:59:59Z&dynamic_filters=[{"field":"event_type","operator":"eq","value":"user_login"}]
+```
+
+## Error Responses
+
+### Validation Error (400)
+```json
+{
+  "detail": "Invalid dynamic_filters JSON: Expecting ',' delimiter"
+}
+```
+
+### Authorization Error (403)
+```json
+{
+  "detail": "Insufficient permissions"
+}
+```
+
+### Not Found Error (404)
+```json
+{
+  "detail": "Audit event not found"
+}
+```
+
+### Internal Server Error (500)
+```json
+{
+  "detail": "Internal server error"
+}
+```
+
+## Rate Limiting
+
+- **Create events**: 1000 requests per minute
+- **Query events**: 300 requests per minute
+- **Export events**: 10 requests per minute
+- **Get single event**: 500 requests per minute
+
+## SDK Examples
+
+### Python SDK
+```python
+from audit_log_sdk import AuditLogClient
+
+client = AuditLogClient(base_url="http://localhost:8000", api_key="your-api-key")
+
+# Query with dynamic filters
+filters = [
+    {"field": "event_type", "operator": "eq", "value": "user_login"},
+    {"field": "status", "operator": "ne", "value": "success"}
+]
+
+results = client.query_events(
+    dynamic_filters=filters,
+    page=1,
+    size=10
 )
 ```
 
-### JavaScript/TypeScript
-```bash
-npm install @audit-service/sdk
+### Go SDK
+```go
+import "github.com/your-org/audit-log-sdk"
+
+client := auditlog.NewClient("http://localhost:8000", "your-api-key")
+
+// Query with dynamic filters
+filters := []auditlog.DynamicFilter{
+    {Field: "event_type", Operator: "eq", Value: "user_login"},
+    {Field: "status", Operator: "ne", Value: "success"},
+}
+
+results, err := client.QueryEvents(context.Background(), &auditlog.QueryOptions{
+    DynamicFilters: filters,
+    Page: 1,
+    Size: 10,
+})
 ```
 
-```javascript
-import { AuditClient } from '@audit-service/sdk';
+## Best Practices
 
-const client = new AuditClient({ apiKey: 'your-api-key' });
-const event = await client.createEvent({
-  eventType: 'user_login',
-  action: 'login',
-  status: 'success',
-  userId: 'user_123'
-});
-```
-
-## OpenAPI Documentation
-
-Interactive API documentation is available at:
-- **Swagger UI**: `/docs`
-- **ReDoc**: `/redoc`
-- **OpenAPI JSON**: `/openapi.json`
-
-## Support
-
-For API support and questions:
-- **Documentation**: [docs.audit-service.com](https://docs.audit-service.com)
-- **GitHub Issues**: [github.com/audit-service/issues](https://github.com/audit-service/issues)
-- **Email**: api-support@audit-service.com
+1. **Use standard filters** for common queries (event_type, status, user_id, etc.)
+2. **Use dynamic filters** for complex or ad-hoc queries
+3. **Combine filters efficiently** using filter groups for OR conditions
+4. **Use case-insensitive matching** for user input fields
+5. **Validate filter syntax** before sending requests
+6. **Use pagination** for large result sets
+7. **Cache filter information** using the `/filters/info` endpoint
+8. **Monitor query performance** and optimize complex filters

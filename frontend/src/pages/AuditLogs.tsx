@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
+import { Filter, ChevronLeft, ChevronRight, Eye, Zap } from 'lucide-react'
 import { auditApi, type AuditEvent } from '@/lib/api'
 import { formatDate, getStatusColor } from '@/lib/utils'
+import { DynamicFilter, type DynamicFilterItem } from '@/components/DynamicFilter'
 
 export function AuditLogs() {
   const [filters, setFilters] = useState({
@@ -18,9 +19,42 @@ export function AuditLogs() {
     sort_order: 'desc' as 'asc' | 'desc',
   })
 
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterItem[]>([])
+  const [filterInfo, setFilterInfo] = useState<{
+    available_fields: string[]
+    supported_operators: string[]
+  }>({ available_fields: [], supported_operators: [] })
+
+  // Fetch filter information
+  const { data: filterInfoData } = useQuery({
+    queryKey: ['filter-info'],
+    queryFn: () => auditApi.getFilterInfo(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  useEffect(() => {
+    if (filterInfoData) {
+      setFilterInfo({
+        available_fields: filterInfoData.available_fields || [],
+        supported_operators: filterInfoData.supported_operators || []
+      })
+    }
+  }, [filterInfoData])
+
+  // Prepare API parameters including dynamic filters
+  const apiParams = {
+    ...filters,
+    dynamic_filters: dynamicFilters.length > 0 ? JSON.stringify(dynamicFilters.map(f => ({
+      field: f.field,
+      operator: f.operator,
+      value: f.value,
+      case_sensitive: f.case_sensitive
+    }))) : undefined
+  }
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['events', filters],
-    queryFn: () => auditApi.getEvents(filters),
+    queryKey: ['events', apiParams],
+    queryFn: () => auditApi.getEvents(apiParams),
   })
 
   const handleFilterChange = (key: string, value: string) => {
@@ -29,6 +63,11 @@ export function AuditLogs() {
 
   const handlePageChange = (page: number) => {
     setFilters(prev => ({ ...prev, page }))
+  }
+
+  const handleDynamicFiltersChange = (newFilters: DynamicFilterItem[]) => {
+    setDynamicFilters(newFilters)
+    setFilters(prev => ({ ...prev, page: 1 }))
   }
 
   if (isLoading) {
@@ -62,6 +101,8 @@ export function AuditLogs() {
           <Filter className="h-5 w-5 text-gray-500" />
           <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
         </div>
+        
+        {/* Basic Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -142,6 +183,16 @@ export function AuditLogs() {
               <option value="asc">Oldest First</option>
             </select>
           </div>
+        </div>
+
+        {/* Dynamic Filters */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <DynamicFilter
+            filters={dynamicFilters}
+            onFiltersChange={handleDynamicFiltersChange}
+            availableFields={filterInfo.available_fields}
+            supportedOperators={filterInfo.supported_operators}
+          />
         </div>
       </div>
 

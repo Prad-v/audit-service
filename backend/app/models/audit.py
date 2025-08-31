@@ -178,6 +178,96 @@ class AuditEventBatchResponse(BaseAuditModel):
     errors: List[Dict[str, Any]] = Field(default_factory=list, description="List of errors for failed events")
 
 
+class FilterOperator(str, Enum):
+    """Supported filter operators for dynamic filtering."""
+    EQUALS = "eq"
+    NOT_EQUALS = "ne"
+    GREATER_THAN = "gt"
+    GREATER_THAN_EQUAL = "gte"
+    LESS_THAN = "lt"
+    LESS_THAN_EQUAL = "lte"
+    IN = "in"
+    NOT_IN = "not_in"
+    CONTAINS = "contains"
+    NOT_CONTAINS = "not_contains"
+    STARTS_WITH = "starts_with"
+    ENDS_WITH = "ends_with"
+    IS_NULL = "is_null"
+    IS_NOT_NULL = "is_not_null"
+    REGEX = "regex"
+
+
+class DynamicFilter(BaseModel):
+    """Dynamic filter for any field with flexible operators."""
+    field: str = Field(..., description="Field name to filter on (supports dot notation for nested fields)")
+    operator: FilterOperator = Field(..., description="Filter operator")
+    value: Optional[Union[str, int, float, bool, List[Any]]] = Field(None, description="Filter value (not required for is_null/is_not_null)")
+    case_sensitive: bool = Field(True, description="Case sensitive matching (for string fields)")
+
+    @validator('field')
+    def validate_field(cls, v):
+        """Validate field name."""
+        if not v or not v.strip():
+            raise ValueError("Field name cannot be empty")
+        return v.strip()
+
+    @root_validator(skip_on_failure=True)
+    def validate_value_for_operator(cls, values):
+        """Validate that value is provided for operators that require it."""
+        operator = values.get('operator')
+        value = values.get('value')
+        
+        if operator in [FilterOperator.IS_NULL, FilterOperator.IS_NOT_NULL]:
+            if value is not None:
+                raise ValueError(f"Value should not be provided for operator '{operator}'")
+        else:
+            if value is None:
+                raise ValueError(f"Value is required for operator '{operator}'")
+        
+        return values
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "field": "event_type",
+                "operator": "eq",
+                "value": "user_login",
+                "case_sensitive": True
+            }
+        }
+
+
+class DynamicFilterGroup(BaseModel):
+    """Group of dynamic filters with logical operator."""
+    filters: List[DynamicFilter] = Field(..., description="List of filters")
+    operator: str = Field("AND", description="Logical operator to combine filters (AND/OR)")
+
+    @validator('operator')
+    def validate_operator(cls, v):
+        """Validate logical operator."""
+        if v.upper() not in ['AND', 'OR']:
+            raise ValueError("Operator must be 'AND' or 'OR'")
+        return v.upper()
+
+    @validator('filters')
+    def validate_filters(cls, v):
+        """Validate that at least one filter is provided."""
+        if not v:
+            raise ValueError("At least one filter must be provided")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filters": [
+                    {"field": "event_type", "operator": "eq", "value": "user_login"},
+                    {"field": "status", "operator": "eq", "value": "success"}
+                ],
+                "operator": "AND"
+            }
+        }
+
+
 class AuditEventQuery(BaseAuditModel):
     """Model for audit event query parameters."""
     
@@ -204,6 +294,10 @@ class AuditEventQuery(BaseAuditModel):
     # Network filters
     ip_address: Optional[str] = Field(None, description="Filter by IP address")
     
+    # Dynamic filters for flexible field querying
+    dynamic_filters: Optional[List[DynamicFilter]] = Field(None, description="Dynamic filters for any field")
+    filter_groups: Optional[List[DynamicFilterGroup]] = Field(None, description="Groups of dynamic filters")
+    
     # Pagination
     page: int = Field(1, description="Page number", ge=1)
     page_size: int = Field(50, description="Page size", ge=1, le=1000)
@@ -227,6 +321,30 @@ class AuditEventQuery(BaseAuditModel):
         
         if start_time and end_time and start_time >= end_time:
             raise ValueError("start_time must be before end_time")
+        
+        return values
+
+    @root_validator(skip_on_failure=True)
+    def validate_dynamic_filters(cls, values):
+        """Validate dynamic filters."""
+        dynamic_filters = values.get('dynamic_filters')
+        filter_groups = values.get('filter_groups')
+        
+        # Only prevent use of query parameter fields, not database fields
+        reserved_fields = {
+            'page', 'page_size', 'sort_by', 'sort_order', 'dynamic_filters', 'filter_groups'
+        }
+        
+        if dynamic_filters:
+            for filter_item in dynamic_filters:
+                if filter_item.field in reserved_fields:
+                    raise ValueError(f"Field '{filter_item.field}' is reserved. Use standard filter parameters instead.")
+        
+        if filter_groups:
+            for group in filter_groups:
+                for filter_item in group.filters:
+                    if filter_item.field in reserved_fields:
+                        raise ValueError(f"Field '{filter_item.field}' is reserved. Use standard filter parameters instead.")
         
         return values
 
