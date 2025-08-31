@@ -19,12 +19,13 @@ class AWSWebhookHandler:
             "dynamodb", "sqs", "api-gateway", "elb", "autoscaling"
         ]
     
-    async def process_webhook(self, payload: Dict[str, Any]) -> List[Any]:
+    async def process_webhook(self, payload: Dict[str, Any], db=None) -> List[Any]:
         """
         Process AWS webhook payload and convert to standard event format
         
         Args:
             payload: Raw webhook payload from AWS
+            db: Database session
             
         Returns:
             List of created event objects
@@ -38,33 +39,57 @@ class AWSWebhookHandler:
             message = self._extract_message(payload)
             details = self._extract_details(payload)
             
-            # Create standardized event
-            event_data = {
-                "event_type": event_type,
-                "source": source,
-                "service": service,
-                "severity": severity,
-                "message": message,
-                "details": details,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "raw_payload": payload
-            }
-            
             logger.info(f"Processed AWS webhook: {event_type} - {message}")
             
-            # For now, return a mock event object
-            # In a real implementation, this would create and save to database
-            mock_event = type("Event", (), {
-                "event_id": f"aws-{datetime.utcnow().timestamp()}",
-                "event_type": event_type,
-                "source": source,
-                "service": service,
-                "severity": severity,
-                "message": message,
-                "details": details
-            })()
-            
-            return [mock_event]
+            # Create actual CloudEvent in database
+            if db:
+                logger.info(f"Creating CloudEvent in database for AWS webhook")
+                from app.db.schemas import CloudEvent
+                from app.models.events import EventType, EventSeverity, CloudProvider
+                
+                event = CloudEvent(
+                    event_id=f"aws-{datetime.utcnow().timestamp()}",
+                    event_type=EventType.CLOUD_ALERT,
+                    severity=EventSeverity(severity),
+                    status="active",
+                    cloud_provider=CloudProvider.AWS,
+                    service_name=service,
+                    region=details.get("region", "unknown"),
+                    title=message,
+                    description=message,
+                    summary=message,
+                    event_time=datetime.utcnow(),
+                    raw_data=payload,
+                    tenant_id="default"
+                )
+                
+                db.add(event)
+                await db.commit()
+                await db.refresh(event)
+                
+                logger.info(f"Created CloudEvent {event.event_id}, calling event processor")
+                
+                # Process for alerting
+                from app.services.event_processor import EventProcessor
+                processor = EventProcessor(db)
+                await processor.process_event(event)
+                
+                logger.info(f"Event processor completed for {event.event_id}")
+                
+                return [event]
+            else:
+                # Fallback to mock event if no database
+                mock_event = type("Event", (), {
+                    "event_id": f"aws-{datetime.utcnow().timestamp()}",
+                    "event_type": event_type,
+                    "source": source,
+                    "service": service,
+                    "severity": severity,
+                    "message": message,
+                    "details": details
+                })()
+                
+                return [mock_event]
             
         except Exception as e:
             logger.error(f"Error processing AWS webhook: {e}")

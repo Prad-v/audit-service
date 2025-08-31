@@ -311,8 +311,8 @@ async def aws_webhook(
     try:
         from app.services.webhook_handlers.aws import AWSWebhookHandler
         
-        handler = AWSWebhookHandler(db)
-        events = await handler.process_webhook(request)
+        handler = AWSWebhookHandler()
+        events = await handler.process_webhook(request, db)
         
         return {
             "success": True,

@@ -15,11 +15,18 @@ import time
 import subprocess
 import sys
 from datetime import datetime
+import uuid
 
 # Configuration
 ALERTING_BASE_URL = "http://localhost:8001"
 AUDIT_BASE_URL = "http://localhost:3000"
 HEADERS = {"Authorization": "Bearer test-token"}
+
+# Generate unique test ID to avoid conflicts
+TEST_ID = f"test-{int(time.time())}-{str(uuid.uuid4())[:8]}"
+
+# Generate unique test ID to avoid conflicts
+TEST_ID = f"test-{int(time.time())}-{str(uuid.uuid4())[:8]}"
 
 
 def check_service_health(url, service_name):
@@ -56,7 +63,7 @@ def create_alert_providers():
     
     # Slack provider
     slack_provider = {
-        "name": "Test Slack",
+        "name": f"Test Slack {TEST_ID}",
         "provider_type": "slack",
         "enabled": True,
         "config": {
@@ -80,7 +87,7 @@ def create_alert_providers():
 
     # Webhook provider
     webhook_provider = {
-        "name": "Test Webhook",
+        "name": f"Test Webhook {TEST_ID}",
         "provider_type": "webhook",
         "enabled": True,
         "config": {
@@ -115,7 +122,7 @@ def create_alert_policies(providers):
     
     # Failed login policy
     failed_login_policy = {
-        "name": "Test Failed Login Alerts",
+        "name": f"Test Failed Login Alerts {TEST_ID}",
         "description": "Alert on failed login attempts",
         "enabled": True,
         "rules": [
@@ -136,7 +143,7 @@ def create_alert_policies(providers):
         "severity": "high",
         "message_template": "Failed login attempt by user {user_id} from IP {ip_address}",
         "summary_template": "Failed login alert for {user_id}",
-        "throttle_minutes": 1,
+        "throttle_minutes": 5,
         "max_alerts_per_hour": 10,
         "providers": [providers['slack'], providers['webhook']]
     }
@@ -153,9 +160,12 @@ def create_alert_policies(providers):
         print(f"❌ Failed to create failed login policy: {response.text}")
         return None
 
+    # Add a small delay to ensure unique policy IDs
+    time.sleep(1)
+
     # Unauthorized access policy
     unauthorized_policy = {
-        "name": "Test Unauthorized Access Alerts",
+        "name": f"Test Unauthorized Access Alerts {TEST_ID}",
         "description": "Alert on unauthorized access attempts",
         "enabled": True,
         "rules": [
@@ -297,73 +307,91 @@ def list_policies_and_providers():
         print(f"❌ Failed to list providers: {response.text}")
 
 
-def test_alerting_integration():
+def cleanup_test_data(providers, policies):
+    """Clean up test data"""
+    print("\n🧹 Cleaning up test data...")
+    
+    # Delete policies
+    if policies:
+        for policy_id in policies.values():
+            try:
+                response = requests.delete(
+                    f"{ALERTING_BASE_URL}/api/v1/alerts/policies/{policy_id}",
+                    headers=HEADERS
+                )
+                if response.status_code == 204:
+                    print(f"   ✅ Deleted policy: {policy_id}")
+                else:
+                    print(f"   ⚠️  Failed to delete policy {policy_id}: {response.status_code}")
+            except Exception as e:
+                print(f"   ⚠️  Error deleting policy {policy_id}: {e}")
+    
+    # Delete providers
+    if providers:
+        for provider_id in providers.values():
+            try:
+                response = requests.delete(
+                    f"{ALERTING_BASE_URL}/api/v1/alerts/providers/{provider_id}",
+                    headers=HEADERS
+                )
+                if response.status_code == 204:
+                    print(f"   ✅ Deleted provider: {provider_id}")
+                else:
+                    print(f"   ⚠️  Failed to delete provider {provider_id}: {response.status_code}")
+            except Exception as e:
+                print(f"   ⚠️  Error deleting provider {provider_id}: {e}")
+
+
+def main():
     """Main test function"""
     print("🧪 Testing Alerting Service Integration")
     print("=" * 60)
     
-    # 1. Check if services are running
+    # Check service health
     print("\n1. Checking service health...")
     if not check_service_health(ALERTING_BASE_URL, "Alerting Service"):
-        print("❌ Alerting service is not running. Please start it first.")
-        print("   Run: docker-compose up -d alerting")
+        print("❌ Alerting service is not available")
         return False
     
     if not check_service_health(AUDIT_BASE_URL, "Audit Service"):
-        print("⚠️  Audit service is not running, but we can still test the alerting service")
+        print("❌ Audit service is not available")
+        return False
     
-    # 2. Create alert providers
+    # Create providers
     providers = create_alert_providers()
     if not providers:
         print("❌ Failed to create alert providers")
         return False
     
-    # 3. Create alert policies
+    # Create policies
     policies = create_alert_policies(providers)
     if not policies:
         print("❌ Failed to create alert policies")
+        cleanup_test_data(providers, None)
         return False
     
-    # 4. Process test events
+    # Process test events
     triggered_alerts = process_test_events(policies)
-    print(f"\n✅ Processed events triggered {len(triggered_alerts)} alerts")
+    print(f"\n📊 Triggered {len(triggered_alerts)} alerts from test events")
     
-    # 5. Verify alerts
+    # Verify alerts
     total_alerts = verify_alerts()
     
-    # 6. List policies and providers
+    # List policies and providers
     list_policies_and_providers()
     
-    # 7. Summary
-    print("\n" + "=" * 60)
-    print("✅ Alerting service integration test completed!")
-    print("\n📋 Summary:")
-    print(f"   - Created {len(providers)} alert providers")
-    print(f"   - Created {len(policies)} alert policies")
-    print(f"   - Generated {total_alerts} alerts")
-    print(f"   - Triggered {len(triggered_alerts)} alerts from test events")
+    # Cleanup
+    cleanup_test_data(providers, policies)
     
-    print("\n🔗 Useful URLs:")
-    print(f"   - Alerting API: {ALERTING_BASE_URL}")
-    print(f"   - Alerting Docs: {ALERTING_BASE_URL}/docs")
-    print(f"   - Audit Service: {AUDIT_BASE_URL}")
-    
-    print("\n💡 Next Steps:")
-    print("   1. Configure real alert providers (PagerDuty, Slack, etc.)")
-    print("   2. Create more specific alert policies")
-    print("   3. Integrate with your audit events")
-    print("   4. Set up monitoring and alerting dashboards")
+    print(f"\n🎉 Alerting integration test completed!")
+    print(f"   - Created {len(providers)} providers")
+    print(f"   - Created {len(policies)} policies")
+    print(f"   - Triggered {len(triggered_alerts)} alerts")
+    print(f"   - Total alerts in system: {total_alerts}")
     
     return True
 
 
 if __name__ == "__main__":
-    try:
-        success = test_alerting_integration()
-        sys.exit(0 if success else 1)
-    except KeyboardInterrupt:
-        print("\n❌ Test interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n❌ Test failed with error: {e}")
-        sys.exit(1)
+    success = main()
+    sys.exit(0 if success else 1)

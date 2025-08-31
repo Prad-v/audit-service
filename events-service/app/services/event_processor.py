@@ -207,12 +207,49 @@ class EventProcessor:
     async def _process_for_alerting(self, event: CloudEvent):
         """Process event for alerting"""
         try:
-            # TODO: Integrate with alerting service
-            # This would send the event to the alerting service for policy evaluation
             logger.info(f"Processing event {event.event_id} for alerting")
+            import httpx
+            
+            # Convert event to alerting service format
+            event_data = {
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "user_id": event.user_id or "system",
+                "ip_address": event.ip_address or "0.0.0.0",
+                "status": event.status,
+                "timestamp": event.event_time.isoformat(),
+                "service_name": event.service_name,
+                "tenant_id": event.tenant_id,
+                "severity": event.severity,
+                "title": event.title,
+                "description": event.description,
+                "summary": event.summary,
+                "raw_data": event.raw_data
+            }
+            
+            logger.info(f"Sending event {event.event_id} to alerting service")
+            
+            # Send to alerting service
+            alerting_url = "http://alerting:8001/api/v1/alerts/process-event"
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    alerting_url,
+                    headers={"Authorization": "Bearer test-token"},
+                    json=event_data,
+                    params={"tenant_id": event.tenant_id}
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"Event {event.event_id} sent to alerting service: {result.get('message', 'processed')}")
+                else:
+                    logger.warning(f"Failed to send event {event.event_id} to alerting service: {response.status_code}")
             
         except Exception as e:
             logger.error(f"Error processing for alerting: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     async def check_event_matches_subscription(self, event_data: Dict[str, Any], subscription: EventSubscription) -> bool:
         """Check if a test event would match a subscription"""

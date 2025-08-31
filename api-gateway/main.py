@@ -250,6 +250,14 @@ async def proxy_alerting_api(request: Request, path: str):
             content=body
         )
         
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+        
         return JSONResponse(
             content=response.json(),
             status_code=response.status_code,
@@ -316,6 +324,14 @@ async def proxy_events_api(request: Request, path: str):
             content=body
         )
         
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+        
         return JSONResponse(
             content=response.json(),
             status_code=response.status_code,
@@ -343,6 +359,14 @@ async def proxy_events_providers_api(request: Request, path: str):
             params=dict(request.query_params),
             content=body
         )
+        
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
         
         return JSONResponse(
             content=response.json(),
@@ -372,6 +396,14 @@ async def proxy_events_subscriptions_api(request: Request, path: str):
             content=body
         )
         
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+        
         return JSONResponse(
             content=response.json(),
             status_code=response.status_code,
@@ -399,6 +431,14 @@ async def proxy_events_alerts_api(request: Request, path: str):
             params=dict(request.query_params),
             content=body
         )
+        
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
         
         return JSONResponse(
             content=response.json(),

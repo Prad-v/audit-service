@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Union
 from uuid import uuid4
 
@@ -235,13 +235,19 @@ class AlertEngine:
             if policy.throttle_minutes <= 0 and policy.max_alerts_per_hour <= 0:
                 return False
             
-            now = datetime.utcnow()
+            # Use timezone-aware datetime
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
             
             # Check throttle minutes
             if policy.throttle_minutes > 0:
                 last_alert = await self._get_last_alert_time(policy.policy_id)
-                if last_alert and (now - last_alert).total_seconds() < policy.throttle_minutes * 60:
-                    return True
+                if last_alert:
+                    # Ensure both datetimes are timezone-aware
+                    if last_alert.tzinfo is None:
+                        last_alert = last_alert.replace(tzinfo=timezone.utc)
+                    if (now - last_alert).total_seconds() < policy.throttle_minutes * 60:
+                        return True
             
             # Check max alerts per hour
             if policy.max_alerts_per_hour > 0:
@@ -284,12 +290,14 @@ class AlertEngine:
             suppression_key = self._create_suppression_key(policy, event_data)
             
             # Check for active suppression
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
             result = await self.db_session.execute(
                 select(AlertSuppression)
                 .where(and_(
                     AlertSuppression.policy_id == policy.policy_id,
                     AlertSuppression.suppression_key == suppression_key,
-                    AlertSuppression.suppressed_until > datetime.utcnow()
+                    AlertSuppression.suppressed_until > now
                 ))
             )
             
@@ -333,7 +341,7 @@ class AlertEngine:
                 summary=summary,
                 event_data=event_data,
                 event_id=event_data.get("event_id"),
-                triggered_at=datetime.utcnow(),
+                triggered_at=datetime.now(timezone.utc),
                 tenant_id=tenant_id,
                 delivery_status={}
             )
