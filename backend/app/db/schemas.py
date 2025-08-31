@@ -294,3 +294,40 @@ class DailyAuditSummary(Base):
         Index('idx_daily_audit_summary_tenant_date', 'tenant_id', 'date'),
         Index('idx_daily_audit_summary_service_date', 'service_name', 'date'),
     )
+
+
+class CloudProject(Base, TimestampMixin):
+    """Cloud project table for managing cloud provider projects."""
+    __tablename__ = "cloud_projects"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False, index=True)
+    cloud_provider = Column(String(50), nullable=False, index=True)
+    project_identifier = Column(String(255), nullable=False, index=True)
+    tenant_id = Column(String(255), nullable=False, index=True)
+    user_id = Column(String(255), nullable=True, index=True)
+    
+    # Connection details
+    credentials = Column(JSON, nullable=True)
+    region = Column(String(100), nullable=True)
+    zone = Column(String(100), nullable=True)
+    
+    # Status and metadata
+    status = Column(String(50), nullable=False, default='active', index=True)
+    description = Column(Text, nullable=True)
+    tags = Column(JSON, nullable=True)
+    
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'inactive', 'error', 'deleted')", 
+                       name='ck_cloud_projects_status'),
+        CheckConstraint("cloud_provider IN ('aws', 'gcp', 'azure', 'oci')", 
+                       name='ck_cloud_projects_provider'),
+        Index('idx_cloud_projects_tenant_provider', 'tenant_id', 'cloud_provider'),
+        Index('idx_cloud_projects_user', 'user_id'),
+        Index('idx_cloud_projects_status', 'status'),
+        UniqueConstraint('tenant_id', 'project_identifier', 'cloud_provider',
+                        name='uq_cloud_projects_tenant_identifier_provider'),
+    )
+
+

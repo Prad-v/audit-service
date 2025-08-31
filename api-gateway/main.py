@@ -37,7 +37,15 @@ SERVICES = {
         "docs_url": "/docs",
         "openapi_url": "/openapi.json",
         "health_url": "/health"
-    }
+    },
+    "events": {
+        "name": "Events Service",
+        "base_url": "http://audit-events:8003",
+        "docs_url": "/docs",
+        "openapi_url": "/openapi.json",
+        "health_url": "/health"
+    },
+
 }
 
 # Global HTTP client
@@ -64,7 +72,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Unified Audit Service API",
-    description="Combined API documentation for Audit Service and Alerting Service",
+    description="Combined API documentation for Audit Service, Alerting Service, and Events Service",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -95,7 +103,7 @@ async def merge_openapi_specs() -> Dict[str, Any]:
         "openapi": "3.0.2",
         "info": {
             "title": "Unified Audit Service API",
-            "description": "Combined API documentation for Audit Service and Alerting Service",
+            "description": "Combined API documentation for Audit Service, Alerting Service, and Events Service",
             "version": "1.0.0"
         },
         "servers": [
@@ -223,34 +231,6 @@ async def get_docs():
     return HTMLResponse(content=html_content)
 
 # Proxy endpoints to individual services
-@app.api_route("/api/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_audit_api(request: Request, path: str):
-    """Proxy requests to audit service"""
-    try:
-        # Build target URL
-        target_url = f"{SERVICES['audit']['base_url']}/api/v1/{path}"
-        
-        # Get request body
-        body = await request.body()
-        
-        # Forward request
-        response = await http_client.request(
-            method=request.method,
-            url=target_url,
-            headers=dict(request.headers),
-            params=dict(request.query_params),
-            content=body
-        )
-        
-        return JSONResponse(
-            content=response.json(),
-            status_code=response.status_code,
-            headers=dict(response.headers)
-        )
-    except Exception as e:
-        logger.error(f"Error proxying to audit service: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
 @app.api_route("/api/v1/alerts/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_alerting_api(request: Request, path: str):
     """Proxy requests to alerting service"""
@@ -277,6 +257,156 @@ async def proxy_alerting_api(request: Request, path: str):
         )
     except Exception as e:
         logger.error(f"Error proxying to alerting service: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+
+@app.api_route("/api/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_audit_api(request: Request, path: str):
+    """Proxy requests to audit service"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['audit']['base_url']}/api/v1/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to audit service: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.api_route("/events/api/v1/events/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_events_api(request: Request, path: str):
+    """Proxy requests to events service events endpoints"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['events']['base_url']}/api/v1/events/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to events service: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.api_route("/events/api/v1/providers/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_events_providers_api(request: Request, path: str):
+    """Proxy requests to events service providers endpoints"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['events']['base_url']}/api/v1/providers/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to events service providers: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.api_route("/events/api/v1/subscriptions/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_events_subscriptions_api(request: Request, path: str):
+    """Proxy requests to events service subscriptions endpoints"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['events']['base_url']}/api/v1/subscriptions/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to events service subscriptions: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.api_route("/events/api/v1/alerts/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_events_alerts_api(request: Request, path: str):
+    """Proxy requests to events service alerts endpoints"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['events']['base_url']}/api/v1/alerts/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to events service alerts: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":

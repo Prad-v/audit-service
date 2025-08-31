@@ -1,0 +1,86 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Development and Deployment Guidelines
+
+## 1. Local Development & Testing
+
+### Docker Compose Requirements
+- All local development and testing must use Docker Compose
+- Direct host machine deployment is prohibited
+- Required configuration:
+  - Define all dependencies in `docker-compose.yml`
+  - Use `.env` files for secrets and overrides
+  - Create environment-specific compose files (e.g., `docker-compose.override.yml`)
+
+### Testing Guidelines
+- All tests must be containerized
+- No direct host test execution
+- Configure volume mounts for live-reloading
+- Ensure consistent test execution via `docker compose up test`
+
+## 2. Deployment & Helm Charts
+
+### Helm Chart Requirements
+- Production deployments must use Helm charts
+- Chart location: `helm/` directory
+- Required files:
+  - `values-dev.yaml`
+  - `values-prod.yaml`
+  - Safe default values without credentials
+
+### CI/CD Integration
+- Automated version management:
+  - Auto-bump Helm chart version on main branch commits
+  - Automatic image tag updates in `values.yaml`
+- Semantic versioning:
+  - Patch: Bug fixes
+  - Minor: New features
+  - Major: Breaking changes
+
+## 3. Documentation Standards
+
+### Documentation Requirements
+- Document all new functionality
+- Location: `docs/` directory
+- Required content:
+  - Usage examples
+  - Environment variables
+  - API schemas
+  - Troubleshooting guides
+- Update main README when relevant
+
+### Static Site Management
+- Update user-facing documentation
+- Maintain sync between `docs/` and static site
+- Use documentation automation tools:
+  - MkDocs
+  - Docusaurus
+  - GitHub Pages
+
+## 4. Backend Service Structure
+
+### Service Organization
+- All backend services must reside in `backend/services/`
+- No services allowed outside designated directory
+- Maintain consistent service structure
+
+## 5. Testing & CI Integration
+
+### Test Organization
+- Single test directory: `tests/`
+- No scattered test files across repository
+- Test requirements:
+  - Register all tests in CI pipeline
+  - Automated test execution
+  - Docker-based test environment
+  - No host dependencies
+  - CI failure on missing tests for new features
+
+### CI Pipeline Integration
+- Every commit triggers test suite
+- Automated test execution
+- Test coverage validation
+- Integration test verification
