@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, TestTube, Bell } from 'lucide-react'
-import { eventsApi, EventSubscription, CloudProject } from '@/lib/api'
+import { eventsApi, cloudApi, EventSubscription } from '@/lib/api'
+
+// Define the CloudProject type based on the actual API response
+type CloudProject = {
+  id: string
+  name: string
+  description?: string
+  cloud_provider: string
+  project_identifier: string
+  credentials?: Record<string, any>
+  region?: string
+  zone?: string
+  tags?: Record<string, any>
+  status: string
+  tenant_id: string
+  user_id: string
+  created_at: string
+  updated_at: string
+}
 
 // Simple toast notification function
 const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -62,10 +80,10 @@ export function EventSubscriptions() {
       setLoading(true)
       const [subscriptionsResponse, projectsResponse] = await Promise.all([
         eventsApi.getEventSubscriptions(),
-        eventsApi.getCloudProjects()
+        cloudApi.getCloudProjects()
       ])
       setSubscriptions(subscriptionsResponse.items || [])
-      setProjects(projectsResponse.items || [])
+      setProjects(projectsResponse || [])
     } catch (error) {
       console.error('Failed to load data:', error)
       showToast('Failed to load event subscriptions', 'error')
@@ -167,7 +185,7 @@ export function EventSubscriptions() {
   }
 
   const getProjectName = (projectId: string) => {
-    const project = projects.find(p => p.project_id === projectId)
+    const project = projects.find(p => p.id === projectId)
     return project ? `${project.name} (${project.cloud_provider})` : 'Unknown Project'
   }
 
@@ -359,6 +377,7 @@ export function EventSubscriptions() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+
                 <select
                   value={formData.project_id}
                   onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))}
@@ -366,7 +385,7 @@ export function EventSubscriptions() {
                 >
                   <option value="">Select a project</option>
                   {projects.map(project => (
-                    <option key={project.project_id} value={project.project_id}>
+                    <option key={project.id} value={project.id}>
                       {project.name} ({project.cloud_provider})
                     </option>
                   ))}

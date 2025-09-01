@@ -5,6 +5,7 @@ Cloud service provider events and monitoring service that ingests events from va
 ## Features
 
 - **Multi-Cloud Support**: GCP, AWS, Azure, OCI integration
+- **Multi-Cloud Outage Monitoring**: Automated monitoring of cloud provider status pages, RSS feeds, and APIs
 - **Grafana Integration**: Process Grafana alert webhooks
 - **Event Subscriptions**: Subscribe to specific event types and services
 - **Cloud Project Management**: Register and manage cloud provider projects
@@ -49,6 +50,16 @@ python test_events.py
 - `POST /api/v1/events/webhook/aws` - AWS webhook
 - `POST /api/v1/events/webhook/azure` - Azure webhook
 - `POST /api/v1/events/webhook/oci` - OCI webhook
+
+### Outage Monitoring
+- `GET /api/v1/outages/status` - Get outage monitoring status
+- `POST /api/v1/outages/start` - Start outage monitoring
+- `POST /api/v1/outages/stop` - Stop outage monitoring
+- `PUT /api/v1/outages/config` - Update monitoring configuration
+- `POST /api/v1/outages/check/{provider}` - Check specific provider for outages
+- `POST /api/v1/outages/check/all` - Check all providers for outages
+- `GET /api/v1/outages/history` - Get outage history
+- `POST /api/v1/outages/webhook/test` - Test webhook delivery
 
 ### Alerting
 - `POST /api/v1/alerts/policies` - Create alert policy

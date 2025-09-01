@@ -11,6 +11,8 @@ alembic==1.13.1
 
 # HTTP client
 httpx==0.25.2
+aiohttp==3.9.1
+feedparser==6.0.10
 
 # Cloud provider SDKs
 google-auth==2.23.4

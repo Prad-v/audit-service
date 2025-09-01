@@ -267,7 +267,41 @@ async def proxy_alerting_api(request: Request, path: str):
         logger.error(f"Error proxying to alerting service: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-
+@app.api_route("/api/v1/outages/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_outages_api(request: Request, path: str):
+    """Proxy requests to events service outages endpoints (direct path)"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['events']['base_url']}/api/v1/outages/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to events service outages: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.api_route("/api/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_audit_api(request: Request, path: str):
@@ -447,6 +481,42 @@ async def proxy_events_alerts_api(request: Request, path: str):
         )
     except Exception as e:
         logger.error(f"Error proxying to events service alerts: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.api_route("/events/api/v1/outages/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_events_outages_api(request: Request, path: str):
+    """Proxy requests to events service outages endpoints"""
+    try:
+        # Build target URL
+        target_url = f"{SERVICES['events']['base_url']}/api/v1/outages/{path}"
+        
+        # Get request body
+        body = await request.body()
+        
+        # Forward request
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            headers=dict(request.headers),
+            params=dict(request.query_params),
+            content=body
+        )
+        
+        # Handle responses with no content (like 204 DELETE responses)
+        if response.status_code == 204 or not response.content:
+            return JSONResponse(
+                content=None,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+        
+        return JSONResponse(
+            content=response.json(),
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to events service outages: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ import { AlertPolicies } from './pages/AlertPolicies'
 import { AlertProviders } from './pages/AlertProviders'
 import { Alerts } from './pages/Alerts'
 import { AlertRules } from './pages/AlertRules'
+import { OutageMonitoring } from './pages/OutageMonitoring'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="/alert-providers" element={<AlertProviders />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/alert-rules" element={<AlertRules />} />
+        <Route path="/outage-monitoring" element={<OutageMonitoring />} />
       </Routes>
     </Layout>
   )

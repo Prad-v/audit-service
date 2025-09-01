@@ -15,15 +15,43 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api/v1/alerts': {
-        target: 'http://localhost:8001',
+        target: 'http://alerting:8001',
         changeOrigin: true,
       },
       '/events/api/v1': {
-        target: 'http://localhost:8002',
+        target: 'http://api-gateway:8002',
         changeOrigin: true,
       },
-      '/api': {
-        target: 'http://localhost:8000',
+      '/api/v1/cloud': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/audit': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/llm': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/mcp': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/metrics': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/auth': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/health': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+      },
+      '/api/v1/outages': {
+        target: 'http://events:8003',
         changeOrigin: true,
       },
     },

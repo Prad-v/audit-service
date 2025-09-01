@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, TestTube, Cloud } from 'lucide-react'
-import { cloudApi, CloudProject } from '@/lib/api'
+import { cloudApi } from '@/lib/api'
+
+// Define the CloudProject type based on the actual API response
+type CloudProject = {
+  id: string
+  name: string
+  description?: string
+  cloud_provider: string
+  project_identifier: string
+  credentials?: Record<string, any>
+  region?: string
+  zone?: string
+  tags?: Record<string, any>
+  status: string
+  tenant_id: string
+  user_id: string
+  created_at: string
+  updated_at: string
+}
 
 // Simple toast notification function
 const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -48,7 +66,7 @@ export function CloudProjects() {
     try {
       setLoading(true)
       const response = await cloudApi.getCloudProjects()
-      setProjects(response.projects || [])
+      setProjects(response || [])
     } catch (error) {
       console.error('Failed to load projects:', error)
       showToast('Failed to load cloud projects', 'error')
@@ -74,7 +92,7 @@ export function CloudProjects() {
     if (!selectedProject) return
 
     try {
-      await cloudApi.updateCloudProject(selectedProject.project_id, formData)
+      await cloudApi.updateCloudProject(selectedProject.id, formData)
       showToast('Cloud project updated successfully')
       setIsEditDialogOpen(false)
       resetForm()
@@ -135,9 +153,9 @@ export function CloudProjects() {
       description: project.description || '',
       cloud_provider: project.cloud_provider,
       project_identifier: project.project_identifier,
-      config: project.config,
-      enabled: project.enabled,
-      auto_subscribe: project.auto_subscribe,
+      config: project.credentials || {},
+      enabled: project.status === 'active',
+      auto_subscribe: true, // Default value since API doesn't provide this
     })
     setIsEditDialogOpen(true)
   }
@@ -364,7 +382,7 @@ export function CloudProjects() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <div key={project.project_id} className="card">
+            <div key={project.id} className="card">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -374,8 +392,8 @@ export function CloudProjects() {
                   <div className="flex space-x-1">
                     <button
                       className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                      onClick={() => handleTestConnection(project.project_id)}
-                      disabled={testingConnection === project.project_id}
+                      onClick={() => handleTestConnection(project.id)}
+                      disabled={testingConnection === project.id}
                     >
                       <TestTube className="w-4 h-4" />
                     </button>
@@ -387,7 +405,7 @@ export function CloudProjects() {
                     </button>
                     <button
                       className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                      onClick={() => handleDeleteProject(project.project_id)}
+                      onClick={() => handleDeleteProject(project.id)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -407,22 +425,16 @@ export function CloudProjects() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Status:</span>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      project.enabled 
+                      project.status === 'active'
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {project.enabled ? 'Enabled' : 'Disabled'}
+                      {project.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Auto Subscribe:</span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      project.auto_subscribe 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {project.auto_subscribe ? 'Yes' : 'No'}
-                    </span>
+                    <span className="text-sm text-gray-600">Region:</span>
+                    <span className="text-sm text-gray-800">{project.region || 'Not specified'}</span>
                   </div>
                 </div>
               </div>

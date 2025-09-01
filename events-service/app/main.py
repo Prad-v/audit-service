@@ -20,6 +20,8 @@ from app.api.v1.events import router as events_router
 from app.api.v1.providers import router as providers_router
 from app.api.v1.subscriptions import router as subscriptions_router
 from app.api.v1.alerts import router as alerts_router
+from app.api.v1.outages import router as outages_router
+from app.services.background_tasks import background_task_manager
 
 # Configure logging
 logging.basicConfig(
@@ -35,12 +37,30 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Events Service...")
     await init_db()
+    
+    # Start background tasks
+    try:
+        from app.core.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await background_task_manager.start_outage_monitoring(session)
+        logger.info("Background tasks started successfully")
+    except Exception as e:
+        logger.error(f"Error starting background tasks: {e}")
+    
     logger.info("Events Service started successfully")
     
     yield
     
     # Shutdown
     logger.info("Shutting down Events Service...")
+    
+    # Stop background tasks
+    try:
+        await background_task_manager.stop_outage_monitoring()
+        logger.info("Background tasks stopped successfully")
+    except Exception as e:
+        logger.error(f"Error stopping background tasks: {e}")
+    
     await close_db()
     logger.info("Events Service shut down successfully")
 
@@ -86,6 +106,7 @@ app.include_router(events_router, prefix="/api/v1/events", tags=["events"])
 app.include_router(providers_router, prefix="/api/v1/providers", tags=["providers"])
 app.include_router(subscriptions_router, prefix="/api/v1/subscriptions", tags=["subscriptions"])
 app.include_router(alerts_router, prefix="/api/v1/alerts", tags=["alerts"])
+app.include_router(outages_router, prefix="/api/v1", tags=["outage-monitoring"])
 
 
 if __name__ == "__main__":
