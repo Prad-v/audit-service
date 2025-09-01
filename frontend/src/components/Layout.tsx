@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare, Settings, AlertTriangle, Bell, Filter, Cloud, WifiOff } from 'lucide-react'
+import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare, Settings, AlertTriangle, Bell, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { auditApi } from '@/lib/api'
 
@@ -49,14 +49,11 @@ export function Layout({ children }: LayoutProps) {
     { name: 'Audit Logs', href: '/audit-logs', icon: FileText },
     { name: 'Create Event', href: '/create-event', icon: Plus },
     { name: 'Natural Language Query', href: '/mcp-query', icon: MessageSquare },
-    { name: 'LLM Providers', href: '/llm-providers', icon: Settings },
-    { name: 'Cloud Projects', href: '/cloud-projects', icon: Cloud },
+    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
     { name: 'Event Subscriptions', href: '/event-subscriptions', icon: Bell },
     { name: 'Cloud Events', href: '/cloud-events', icon: AlertTriangle },
     { name: 'Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
-    { name: 'Alert Rules', href: '/alert-rules', icon: Filter },
-    { name: 'Alert Policies', href: '/alert-policies', icon: AlertTriangle },
-    { name: 'Alert Providers', href: '/alert-providers', icon: Bell },
     { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   ]
 

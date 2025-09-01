@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Filter, ChevronLeft, ChevronRight, Eye, Zap } from 'lucide-react'
+import { Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 import { auditApi, type AuditEvent } from '@/lib/api'
 import { formatDate, getStatusColor } from '@/lib/utils'
 import { DynamicFilter, type DynamicFilterItem } from '@/components/DynamicFilter'

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Eye, CheckCircle, XCircle, RefreshCw, AlertTriangle } from 'lucide-react'
-import { eventsApi, CloudEvent, CloudProject, EventSubscription, EventsSummary } from '@/lib/api'
+import { eventsApi, cloudApi, CloudEvent, CloudProject, EventSubscription, EventsSummary } from '@/lib/api'
 
 // Simple toast notification function
 const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -67,7 +67,7 @@ export function CloudEvents() {
       setLoading(true)
       const [eventsResponse, projectsResponse, subscriptionsResponse, summaryResponse] = await Promise.all([
         eventsApi.getCloudEvents(filters),
-        eventsApi.getCloudProjects(),
+        cloudApi.getCloudProjects(),
         eventsApi.getEventSubscriptions(),
         eventsApi.getEventsSummary()
       ])

@@ -5,14 +5,11 @@ import { AuditLogs } from './pages/AuditLogs'
 import { CreateEvent } from './pages/CreateEvent'
 import { EventDetails } from './pages/EventDetails'
 import MCPQuery from './pages/MCPQuery'
-import LLMProviders from './pages/LLMProviders'
-import { CloudProjects } from './pages/CloudProjects'
+import { Settings } from './pages/Settings'
+import { AlertManagement } from './pages/AlertManagement'
 import { EventSubscriptions } from './pages/EventSubscriptions'
 import { CloudEvents } from './pages/CloudEvents'
-import { AlertPolicies } from './pages/AlertPolicies'
-import { AlertProviders } from './pages/AlertProviders'
 import { Alerts } from './pages/Alerts'
-import { AlertRules } from './pages/AlertRules'
 import { OutageMonitoring } from './pages/OutageMonitoring'
 
 function App() {
@@ -24,14 +21,11 @@ function App() {
         <Route path="/create-event" element={<CreateEvent />} />
         <Route path="/events/:id" element={<EventDetails />} />
         <Route path="/mcp-query" element={<MCPQuery />} />
-        <Route path="/llm-providers" element={<LLMProviders />} />
-        <Route path="/cloud-projects" element={<CloudProjects />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/alert-management" element={<AlertManagement />} />
         <Route path="/event-subscriptions" element={<EventSubscriptions />} />
         <Route path="/cloud-events" element={<CloudEvents />} />
-        <Route path="/alert-policies" element={<AlertPolicies />} />
-        <Route path="/alert-providers" element={<AlertProviders />} />
         <Route path="/alerts" element={<Alerts />} />
-        <Route path="/alert-rules" element={<AlertRules />} />
         <Route path="/outage-monitoring" element={<OutageMonitoring />} />
       </Routes>
     </Layout>

@@ -388,7 +388,7 @@ const MCPClient: React.FC<MCPClientProps> = ({ onMessage, className = '' }) => {
               </div>
               <div className="mt-6 flex justify-end">
                 <button
-                  onClick={() => window.open('/llm-providers', '_blank')}
+                  onClick={() => window.open('/settings', '_blank')}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                   Manage Providers

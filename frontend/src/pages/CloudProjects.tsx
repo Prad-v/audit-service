@@ -213,13 +213,7 @@ export function CloudProjects() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Cloud Projects</h1>
-          <p className="text-gray-600 mt-2">
-            Manage cloud provider projects for event monitoring
-          </p>
-        </div>
+      <div className="flex justify-end">
         <button
           onClick={() => setIsCreateDialogOpen(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"

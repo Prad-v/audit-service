@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, AlertTriangle, CheckCircle, Clock, Activity, Calendar, BarChart3, Filter, Circle, X, ExternalLink } from 'lucide-react'
+import { RefreshCw, AlertTriangle, CheckCircle, Activity, Calendar, BarChart3, Filter, Circle, X, ExternalLink } from 'lucide-react'
 import { eventsApi } from '@/lib/api'
 import { OutageProgressSlider } from '../components/OutageProgressSlider'
 
@@ -233,58 +233,8 @@ const extractTimeFromString = (timeStr: string): Date | null => {
   return null
 }
 
-// Timeline Component
-function TimelineView({ timeline }: { timeline: TimelineEvent[] }) {
-  if (timeline.length === 0) return null
-  
-  return (
-    <div className="space-y-4">
-      <div className="text-gray-500 font-medium">Timeline:</div>
-      <div className="relative">
-        {/* Timeline line */}
-        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-300"></div>
-        
-        <div className="space-y-4">
-          {timeline.map((event, index) => (
-            <div key={index} className="relative flex items-start space-x-4">
-              {/* Timeline dot */}
-              <div className="relative z-10 flex-shrink-0">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  event.type === 'start' ? 'bg-green-500' :
-                  event.type === 'resolution' ? 'bg-blue-500' :
-                  event.type === 'milestone' ? 'bg-yellow-500' :
-                  'bg-gray-500'
-                }`}>
-                  <Circle className="w-4 h-4 text-white" fill="currentColor" />
-                </div>
-              </div>
-              
-              {/* Event content */}
-              <div className="flex-1 min-w-0 bg-white rounded-lg border p-3 shadow-sm">
-                <div className="text-sm font-medium text-gray-900 mb-1">
-                  {event.time}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {event.description}
-                </div>
-                <div className="mt-1">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    event.type === 'start' ? 'bg-green-100 text-green-800' :
-                    event.type === 'resolution' ? 'bg-blue-100 text-blue-800' :
-                    event.type === 'milestone' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {event.type}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+
+
 
 // Summary Component for better readability
 function IncidentSummary({ outage, onViewDetails }: { outage: OutageEvent; onViewDetails: (outage: OutageEvent) => void }) {
@@ -603,7 +553,7 @@ export function OutageMonitoring() {
   const [showProgressSlider, setShowProgressSlider] = useState(false)
   const [progress, setProgress] = useState(0)
   const [providerResults, setProviderResults] = useState<Record<string, ProviderResult>>({})
-  const [currentProvider, setCurrentProvider] = useState<string>('')
+
   const [totalOutagesFound, setTotalOutagesFound] = useState(0)
   
   // Filter state
@@ -689,25 +639,7 @@ export function OutageMonitoring() {
     setSelectedOutage(null)
   }
 
-  const pauseMonitoring = async () => {
-    try {
-      await eventsApi.pauseOutageMonitoring()
-      await loadStatus()
-    } catch (err) {
-      console.error('Failed to pause monitoring:', err)
-      setError('Failed to pause monitoring')
-    }
-  }
 
-  const resumeMonitoring = async () => {
-    try {
-      await eventsApi.resumeOutageMonitoring()
-      await loadStatus()
-    } catch (err) {
-      console.error('Failed to resume monitoring:', err)
-      setError('Failed to resume monitoring')
-    }
-  }
 
   const checkAllProviders = async () => {
     try {
@@ -860,7 +792,6 @@ export function OutageMonitoring() {
         progress={progress}
         providerResults={providerResults}
         totalOutagesFound={totalOutagesFound}
-        currentProvider={currentProvider}
       />
 
       {/* Detailed Incident Slider */}

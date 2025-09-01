@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Activity, FileText, Plus, Clock, BookOpen, Database, Zap, MessageSquare, TrendingUp, BarChart3, Cpu, HardDrive } from 'lucide-react'
+import { Activity, FileText, Plus, Clock, BookOpen, Database, Zap, MessageSquare, TrendingUp, BarChart3, Cpu, HardDrive, Settings } from 'lucide-react'
 import { auditApi, type AuditEvent, type TopEventType } from '@/lib/api'
 
 export function Dashboard() {
@@ -357,6 +357,16 @@ export function Dashboard() {
               <p className="text-sm text-gray-600">Advanced metrics and monitoring</p>
             </div>
           </a>
+          <Link
+            to="/settings"
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Settings className="h-8 w-8 text-indigo-600 mr-4" />
+            <div>
+              <h3 className="font-medium text-gray-900">Settings</h3>
+              <p className="text-sm text-gray-600">Configure cloud projects and LLM providers</p>
+            </div>
+          </Link>
         </div>
       </div>
 
