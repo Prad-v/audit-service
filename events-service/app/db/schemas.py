@@ -340,3 +340,48 @@ class AlertSuppression(Base, TimestampMixin):
         Index('idx_alert_suppressions_tenant_until', 'tenant_id', 'suppressed_until'),
         UniqueConstraint('policy_id', 'suppression_key', name='uq_alert_suppressions_policy_key'),
     )
+
+
+class EventProcessor(Base, TimestampMixin):
+    """Event processor configuration for transforming and enriching events"""
+    __tablename__ = "event_processors"
+    
+    processor_id = Column(String(255), primary_key=True)
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    
+    # Processor type and configuration
+    processor_type = Column(String(50), nullable=False, index=True)  # transformer, enricher, filter, router
+    config = Column(JSON, nullable=False)  # Processor-specific configuration
+    
+    # Processing order and dependencies
+    order = Column(Integer, nullable=False, default=0, index=True)
+    depends_on = Column(JSON, nullable=True)  # List of processor IDs this depends on
+    
+    # Event filtering criteria
+    event_types = Column(JSON, nullable=True)  # List of event types to process
+    severity_levels = Column(JSON, nullable=True)  # List of severity levels to process
+    cloud_providers = Column(JSON, nullable=True)  # List of cloud providers to process
+    
+    # Processing rules and conditions
+    conditions = Column(JSON, nullable=True)  # Conditional logic for when to apply processor
+    transformations = Column(JSON, nullable=False)  # Transformation rules and mappings
+    
+    # Status and monitoring
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    last_processed = Column(DateTime(timezone=True), nullable=True)
+    processed_count = Column(Integer, nullable=False, default=0)
+    error_count = Column(Integer, nullable=False, default=0)
+    
+    # Metadata
+    tenant_id = Column(String(255), nullable=False, index=True)
+    created_by = Column(String(255), nullable=False, index=True)
+    
+    __table_args__ = (
+        CheckConstraint("processor_type IN ('transformer', 'enricher', 'filter', 'router')", 
+                       name='ck_event_processors_type'),
+        Index('idx_event_processors_tenant_enabled', 'tenant_id', 'enabled'),
+        Index('idx_event_processors_type_enabled', 'processor_type', 'enabled'),
+        Index('idx_event_processors_order', 'order'),
+        Index('idx_event_processors_created_by', 'created_by'),
+    )

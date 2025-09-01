@@ -54,6 +54,10 @@ export default defineConfig({
         target: 'http://events:8003',
         changeOrigin: true,
       },
+      '/api/v1/processors': {
+        target: 'http://events:8003',
+        changeOrigin: true,
+      },
     },
   },
   build: {

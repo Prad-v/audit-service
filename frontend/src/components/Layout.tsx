@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare, Settings, AlertTriangle, Bell, WifiOff } from 'lucide-react'
+import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare, Settings, AlertTriangle, Database, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { auditApi } from '@/lib/api'
 
@@ -51,8 +51,7 @@ export function Layout({ children }: LayoutProps) {
     { name: 'Natural Language Query', href: '/mcp-query', icon: MessageSquare },
     { name: 'Settings', href: '/settings', icon: Settings },
     { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
-    { name: 'Event Subscriptions', href: '/event-subscriptions', icon: Bell },
-    { name: 'Cloud Events', href: '/cloud-events', icon: AlertTriangle },
+    { name: 'Event Framework', href: '/event-framework', icon: Database },
     { name: 'Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
     { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   ]

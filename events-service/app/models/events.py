@@ -722,3 +722,94 @@ class AlertListResponse(BaseModel):
     total: int
     page: int
     per_page: int
+
+
+# Event Processor Models
+class EventProcessorType(str, Enum):
+    """Types of event processors"""
+    TRANSFORMER = "transformer"
+    ENRICHER = "enricher"
+    FILTER = "filter"
+    ROUTER = "router"
+
+
+class EventProcessorCreate(BaseModel):
+    """Create event processor request model"""
+    name: str = Field(..., min_length=1, max_length=255, description="Processor name")
+    description: Optional[str] = Field(None, max_length=1000, description="Processor description")
+    processor_type: EventProcessorType = Field(..., description="Type of processor")
+    config: Dict[str, Any] = Field(..., description="Processor-specific configuration")
+    order: int = Field(0, ge=0, description="Processing order (lower numbers first)")
+    depends_on: Optional[List[str]] = Field(None, description="List of processor IDs this depends on")
+    event_types: Optional[List[str]] = Field(None, description="List of event types to process")
+    severity_levels: Optional[List[str]] = Field(None, description="List of severity levels to process")
+    cloud_providers: Optional[List[str]] = Field(None, description="List of cloud providers to process")
+    conditions: Optional[Dict[str, Any]] = Field(None, description="Conditional logic for when to apply processor")
+    transformations: Dict[str, Any] = Field(..., description="Transformation rules and mappings")
+    enabled: bool = Field(True, description="Whether the processor is enabled")
+    tenant_id: str = Field(..., description="Tenant ID")
+    created_by: str = Field(..., description="User who created the processor")
+
+
+class EventProcessorUpdate(BaseModel):
+    """Update event processor request model"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Processor name")
+    description: Optional[str] = Field(None, max_length=1000, description="Processor description")
+    processor_type: Optional[EventProcessorType] = Field(None, description="Type of processor")
+    config: Optional[Dict[str, Any]] = Field(None, description="Processor-specific configuration")
+    order: Optional[int] = Field(None, ge=0, description="Processing order (lower numbers first)")
+    depends_on: Optional[List[str]] = Field(None, description="List of processor IDs this depends on")
+    event_types: Optional[List[str]] = Field(None, description="List of event types to process")
+    severity_levels: Optional[List[str]] = Field(None, description="List of severity levels to process")
+    cloud_providers: Optional[List[str]] = Field(None, description="List of cloud providers to process")
+    conditions: Optional[Dict[str, Any]] = Field(None, description="Conditional logic for when to apply processor")
+    transformations: Optional[Dict[str, Any]] = Field(None, description="Transformation rules and mappings")
+    enabled: Optional[bool] = Field(None, description="Whether the processor is enabled")
+
+
+class EventProcessorResponse(BaseModel):
+    """Response model for event processor"""
+    processor_id: str
+    name: str
+    description: Optional[str]
+    processor_type: EventProcessorType
+    config: Dict[str, Any]
+    order: int
+    depends_on: Optional[List[str]]
+    event_types: Optional[List[str]]
+    severity_levels: Optional[List[str]]
+    cloud_providers: Optional[List[str]]
+    conditions: Optional[Dict[str, Any]]
+    transformations: Dict[str, Any]
+    enabled: bool
+    last_processed: Optional[datetime]
+    processed_count: int
+    error_count: int
+    tenant_id: str
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EventProcessorListResponse(BaseModel):
+    """Response model for list of event processors"""
+    processors: List[EventProcessorResponse]
+    total: int
+    page: int
+    per_page: int
+
+
+class EventProcessorStats(BaseModel):
+    """Statistics for event processor"""
+    processor_id: str
+    name: str
+    processor_type: EventProcessorType
+    processed_count: int
+    error_count: int
+    last_processed: Optional[datetime]
+    avg_processing_time: Optional[float]
+    success_rate: float
+    enabled: bool

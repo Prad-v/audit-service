@@ -21,6 +21,7 @@ from app.api.v1.providers import router as providers_router
 from app.api.v1.subscriptions import router as subscriptions_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.outages import router as outages_router
+from app.api.v1.processors import router as processors_router
 from app.services.background_tasks import background_task_manager
 
 # Configure logging
@@ -107,6 +108,7 @@ app.include_router(providers_router, prefix="/api/v1/providers", tags=["provider
 app.include_router(subscriptions_router, prefix="/api/v1/subscriptions", tags=["subscriptions"])
 app.include_router(alerts_router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(outages_router, prefix="/api/v1", tags=["outage-monitoring"])
+app.include_router(processors_router, prefix="/api/v1", tags=["event-processors"])
 
 
 if __name__ == "__main__":
