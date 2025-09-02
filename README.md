@@ -96,6 +96,15 @@ Once started, the following services will be available:
 - **Real-time Processing**: Async event processing and alert delivery
 - **Scalable Architecture**: Horizontal scaling support
 
+### Event Management System
+- **Event Subscriptions**: Support for multiple input sources (Webhook, HTTP Client, Pub/Sub, Kinesis, PagerDuty, NATS)
+- **Event Processors**: Transform and enrich events using custom logic
+- **Event Pipeline Builder**: Visual DAG-based pipeline construction
+- **Product Status Management**: Comprehensive incident management with CloudEvent integration and RSS feeds
+- **Event Pipeline Builder**: Visual DAG-based pipeline builder for complex event workflows
+- **Pub/Sub Integration**: Google Cloud Pub/Sub with service account encryption and workload identity support
+- **Real-time Processing**: Stream processing with configurable transformations and routing
+
 ## 🛠️ Development
 
 ### Local Development Setup
@@ -157,6 +166,16 @@ Once started, the following services will be available:
 - `GET /api/v1/alerts/providers` - List alert providers
 - `POST /api/v1/alerts/process-event` - Process event and trigger alerts
 - `GET /api/v1/alerts/alerts` - List alerts
+
+### Event Management System
+- `POST /api/v1/subscriptions/subscriptions` - Create event subscription
+- `GET /api/v1/subscriptions/subscriptions` - List event subscriptions
+- `POST /api/v1/processors` - Create event processor
+- `GET /api/v1/processors` - List event processors
+- `POST /api/v1/processors/{id}/run` - Test event processor
+- `POST /api/v1/pubsub/subscriptions` - Create Pub/Sub subscription
+- `GET /api/v1/pubsub/subscriptions` - List Pub/Sub subscriptions
+- `POST /api/v1/pubsub/subscriptions/{id}/test` - Test Pub/Sub connection
 
 ## 🔧 Configuration
 

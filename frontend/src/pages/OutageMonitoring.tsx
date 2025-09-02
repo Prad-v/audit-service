@@ -925,8 +925,8 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
     setLoading(true)
     setError(null)
     try {
-      // Use direct events service port for now until API Gateway is fixed
-      const response = await fetch('http://localhost:8003/api/v1/outages/active')
+      // Use the proxy endpoint instead of direct service call
+      const response = await fetch('/api/v1/outages/active')
       if (response.ok) {
         const data = await response.json()
         const outages = data.outages || []

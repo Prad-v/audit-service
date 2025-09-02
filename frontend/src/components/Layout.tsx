@@ -52,7 +52,9 @@ export function Layout({ children }: LayoutProps) {
     { name: 'Settings', href: '/settings', icon: Settings },
     { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
     { name: 'Event Framework', href: '/event-framework', icon: Database },
+    { name: 'Event Pipeline Builder', href: '/event-pipeline-builder', icon: Database },
     { name: 'Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
+    { name: 'Product Status', href: '/product-status', icon: AlertTriangle },
     { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   ]
 

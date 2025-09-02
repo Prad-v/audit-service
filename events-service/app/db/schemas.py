@@ -60,6 +60,34 @@ class EventStatus(str, enum.Enum):
     SUPPRESSED = "suppressed"
 
 
+class IncidentStatus(str, enum.Enum):
+    """Incident status for product outages"""
+    INVESTIGATING = "investigating"
+    IDENTIFIED = "identified"
+    MONITORING = "monitoring"
+    RESOLVED = "resolved"
+    POST_INCIDENT = "post_incident"
+
+
+class IncidentSeverity(str, enum.Enum):
+    """Incident severity levels"""
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    MINOR = "minor"
+
+
+class IncidentType(str, enum.Enum):
+    """Types of incidents"""
+    OUTAGE = "outage"
+    DEGRADED_PERFORMANCE = "degraded_performance"
+    MAINTENANCE = "maintenance"
+    SECURITY = "security"
+    FEATURE_DISABLED = "feature_disabled"
+    OTHER = "other"
+
+
 class CloudProject(Base, TimestampMixin):
     """Cloud project configuration"""
     __tablename__ = "cloud_projects"
@@ -384,4 +412,113 @@ class EventProcessor(Base, TimestampMixin):
         Index('idx_event_processors_type_enabled', 'processor_type', 'enabled'),
         Index('idx_event_processors_order', 'order'),
         Index('idx_event_processors_created_by', 'created_by'),
+    )
+
+
+class PubSubSubscription(Base, TimestampMixin):
+    """Pub/Sub subscription configuration for Google Cloud Pub/Sub"""
+    __tablename__ = "pubsub_subscriptions"
+    
+    subscription_id = Column(String(255), primary_key=True)
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    
+    # Configuration stored as JSON
+    config = Column(JSON, nullable=False)  # PubSubSubscriptionConfig
+    
+    # Status and monitoring
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    
+    # Metadata
+    tenant_id = Column(String(255), nullable=False, index=True)
+    created_by = Column(String(255), nullable=False, index=True)
+    
+    __table_args__ = (
+        Index('idx_pubsub_subscriptions_tenant_enabled', 'tenant_id', 'enabled'),
+        Index('idx_pubsub_subscriptions_created_by', 'created_by'),
+        Index('idx_pubsub_subscriptions_name', 'name'),
+    )
+
+
+class Incident(Base, TimestampMixin):
+    """Product outage incident table"""
+    __tablename__ = "incidents"
+    
+    incident_id = Column(String(255), primary_key=True)
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(Enum(IncidentStatus), nullable=False, index=True)
+    severity = Column(Enum(IncidentSeverity), nullable=False, index=True)
+    incident_type = Column(Enum(IncidentType), nullable=False, index=True)
+    
+    # Affected services and regions
+    affected_services = Column(JSON, nullable=False)  # List of service names
+    affected_regions = Column(JSON, nullable=True)   # List of regions
+    affected_components = Column(JSON, nullable=True) # List of components
+    
+    # Timeline
+    start_time = Column(DateTime(timezone=True), nullable=False, index=True)
+    end_time = Column(DateTime(timezone=True), nullable=True, index=True)
+    estimated_resolution = Column(DateTime(timezone=True), nullable=True)
+    
+    # Communication
+    public_message = Column(Text, nullable=False)
+    internal_notes = Column(Text, nullable=True)
+    
+    # Metadata
+    created_by = Column(String(255), nullable=False, index=True)
+    assigned_to = Column(String(255), nullable=True, index=True)
+    tags = Column(JSON, nullable=True)  # List of tags
+    
+    # Visibility and RSS
+    is_public = Column(Boolean, nullable=False, default=True, index=True)
+    rss_enabled = Column(Boolean, nullable=False, default=True, index=True)
+    
+    # CloudEvent integration
+    event_id = Column(String(255), nullable=True, index=True)
+    event_source = Column(String(255), nullable=True)
+    
+    # Relationships
+    updates = relationship("IncidentUpdate", back_populates="incident", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index('idx_incidents_status_severity', 'status', 'severity'),
+        Index('idx_incidents_start_time', 'start_time'),
+        Index('idx_incidents_public_rss', 'is_public', 'rss_enabled'),
+        Index('idx_incidents_created_by', 'created_by'),
+        Index('idx_incidents_assigned_to', 'assigned_to'),
+        Index('idx_incidents_type', 'incident_type'),
+    )
+
+
+class IncidentUpdate(Base, TimestampMixin):
+    """Individual updates to incidents"""
+    __tablename__ = "incident_updates"
+    
+    update_id = Column(String(255), primary_key=True)
+    incident_id = Column(String(255), ForeignKey("incidents.incident_id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(Enum(IncidentStatus), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    public_message = Column(Text, nullable=False)
+    internal_notes = Column(Text, nullable=True)
+    
+    # Update metadata
+    update_type = Column(String(100), nullable=False, default="status_update")
+    created_by = Column(String(255), nullable=False, index=True)
+    is_public = Column(Boolean, nullable=False, default=True, index=True)
+    
+    # Optional fields
+    affected_services = Column(JSON, nullable=True)  # Updated list of services
+    affected_regions = Column(JSON, nullable=True)   # Updated list of regions
+    estimated_resolution = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    incident = relationship("Incident", back_populates="updates")
+    
+    __table_args__ = (
+        Index('idx_incident_updates_incident_id', 'incident_id'),
+        Index('idx_incident_updates_status', 'status'),
+        Index('idx_incident_updates_created_by', 'created_by'),
+        Index('idx_incident_updates_public', 'is_public'),
+        Index('idx_incident_updates_type', 'update_type'),
     )

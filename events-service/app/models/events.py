@@ -44,6 +44,34 @@ class EventStatus(str, Enum):
     SUPPRESSED = "suppressed"
 
 
+class IncidentStatus(str, Enum):
+    """Incident status for product outages"""
+    INVESTIGATING = "investigating"
+    IDENTIFIED = "identified"
+    MONITORING = "monitoring"
+    RESOLVED = "resolved"
+    POST_INCIDENT = "post_incident"
+
+
+class IncidentSeverity(str, Enum):
+    """Incident severity levels"""
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    MINOR = "minor"
+
+
+class IncidentType(str, Enum):
+    """Types of incidents"""
+    OUTAGE = "outage"
+    DEGRADED_PERFORMANCE = "degraded_performance"
+    MAINTENANCE = "maintenance"
+    SECURITY = "security"
+    FEATURE_DISABLED = "feature_disabled"
+    OTHER = "other"
+
+
 class AlertSeverity(str, Enum):
     """Alert severity levels"""
     CRITICAL = "critical"
@@ -537,6 +565,73 @@ class AlertProviderUpdate(BaseModel):
     config: Optional[Dict[str, Any]] = None
 
 
+# Pub/Sub Subscription Models
+class PubSubWorkloadIdentity(BaseModel):
+    """Workload Identity configuration for Pub/Sub"""
+    enabled: bool = False
+    service_account: str = ""
+    audience: str = "https://pubsub.googleapis.com/google.pubsub.v1.Publisher"
+
+
+class PubSubSubscriptionConfig(BaseModel):
+    """Configuration for Pub/Sub subscriptions"""
+    topic: str
+    project_id: str
+    subscription_id: str
+    authentication_method: str = "service_account"  # "service_account" | "workload_identity"
+    service_account_key: Optional[str] = None  # Will be encrypted when stored
+    workload_identity: Optional[PubSubWorkloadIdentity] = None
+    region: str = "us-central1"
+    ack_deadline_seconds: int = 20
+    message_retention_duration: str = "7d"
+    enable_message_ordering: bool = False
+    filter: Optional[str] = None
+    dead_letter_topic: Optional[str] = None
+    max_retry_attempts: int = 5
+
+
+class PubSubSubscriptionCreate(BaseModel):
+    """Request model for creating Pub/Sub subscription"""
+    name: str
+    description: Optional[str] = None
+    config: PubSubSubscriptionConfig
+    enabled: bool = True
+    tenant_id: str = "default"
+    created_by: str
+
+
+class PubSubSubscriptionUpdate(BaseModel):
+    """Request model for updating Pub/Sub subscription"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    config: Optional[PubSubSubscriptionConfig] = None
+    enabled: Optional[bool] = None
+
+
+class PubSubSubscriptionResponse(BaseModel):
+    """Response model for Pub/Sub subscription"""
+    subscription_id: str
+    name: str
+    description: Optional[str]
+    config: PubSubSubscriptionConfig
+    enabled: bool
+    tenant_id: str
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PubSubSubscriptionListResponse(BaseModel):
+    """Response model for listing Pub/Sub subscriptions"""
+    subscriptions: List[PubSubSubscriptionResponse]
+    total: int
+    page: int
+    per_page: int
+
+
 # Response Models
 class CloudProjectResponse(BaseModel):
     """Response model for cloud projects"""
@@ -813,3 +908,274 @@ class EventProcessorStats(BaseModel):
     avg_processing_time: Optional[float]
     success_rate: float
     enabled: bool
+
+# Webhook Configuration Models
+class WebhookAuthBasic(BaseModel):
+    """Basic authentication configuration for webhook"""
+    username: str = Field(..., description="Username for basic authentication")
+    password: str = Field(..., description="Password for basic authentication")
+
+class WebhookAuthBearer(BaseModel):
+    """Bearer token authentication configuration for webhook"""
+    token: str = Field(..., description="Bearer token for authentication")
+
+class WebhookAuthApiKey(BaseModel):
+    """API key authentication configuration for webhook"""
+    header_name: str = Field(..., description="Header name for API key")
+    api_key: str = Field(..., description="API key value")
+
+class WebhookAuthCustom(BaseModel):
+    """Custom VRL expression authentication configuration for webhook"""
+    expression: str = Field(..., description="VRL expression for custom authentication")
+
+class WebhookSSLConfig(BaseModel):
+    """SSL/TLS configuration for webhook server"""
+    enabled: bool = Field(default=False, description="Whether SSL/TLS is enabled")
+    cert_file: Optional[str] = Field(None, description="Path to SSL certificate file")
+    key_file: Optional[str] = Field(None, description="Path to SSL private key file")
+    ca_file: Optional[str] = Field(None, description="Path to CA certificate file")
+
+class WebhookCORSConfig(BaseModel):
+    """CORS configuration for webhook server"""
+    enabled: bool = Field(default=False, description="Whether CORS is enabled")
+    origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
+    methods: List[str] = Field(default=["POST", "PUT", "PATCH"], description="Allowed HTTP methods")
+    headers: List[str] = Field(default=["Content-Type", "Authorization"], description="Allowed headers")
+
+class WebhookConfig(BaseModel):
+    """Comprehensive webhook server configuration"""
+    # Basic configuration
+    address: str = Field(default="0.0.0.0", description="Address to bind to")
+    port: int = Field(default=8080, description="Port to listen on")
+    endpoint: str = Field(default="/webhook/events", description="Webhook endpoint path")
+    method: str = Field(default="POST", description="HTTP method to accept")
+    
+    # Authentication
+    authentication: str = Field(default="none", description="Authentication type")
+    auth_basic: Optional[WebhookAuthBasic] = Field(None, description="Basic auth configuration")
+    auth_bearer: Optional[WebhookAuthBearer] = Field(None, description="Bearer token configuration")
+    auth_api_key: Optional[WebhookAuthApiKey] = Field(None, description="API key configuration")
+    auth_custom: Optional[WebhookAuthCustom] = Field(None, description="Custom VRL expression")
+    
+    # SSL/TLS
+    ssl: WebhookSSLConfig = Field(default_factory=WebhookSSLConfig, description="SSL/TLS configuration")
+    
+    # Advanced configuration
+    encoding: str = Field(default="json", description="Data encoding (json, text, binary, avro)")
+    response_code: int = Field(default=200, description="HTTP response code to return")
+    max_body_size: str = Field(default="10MB", description="Maximum request body size")
+    rate_limit: int = Field(default=1000, description="Rate limit in requests per minute")
+    compression: str = Field(default="auto", description="Compression handling (auto, gzip, deflate, snappy, zstd)")
+    
+    # Request processing
+    path: str = Field(default="/", description="Path to match")
+    strict_path: bool = Field(default=False, description="Strict path matching")
+    path_key: str = Field(default="path", description="Field name for path in events")
+    host_key: str = Field(default="host", description="Field name for host in events")
+    headers: List[str] = Field(default=["User-Agent", "Content-Type"], description="Headers to capture")
+    query_parameters: List[str] = Field(default=[], description="Query parameters to capture")
+    
+    # CORS
+    cors: WebhookCORSConfig = Field(default_factory=WebhookCORSConfig, description="CORS configuration")
+
+class WebhookSubscriptionCreate(BaseModel):
+    """Request model for creating webhook subscription"""
+    name: str = Field(..., description="Webhook subscription name")
+    description: Optional[str] = Field(None, description="Webhook description")
+    config: WebhookConfig = Field(..., description="Webhook configuration")
+    enabled: bool = Field(default=True, description="Whether webhook is enabled")
+    tenant_id: str = Field(default="default", description="Tenant ID")
+    created_by: str = Field(..., description="User creating the webhook")
+
+class WebhookSubscriptionUpdate(BaseModel):
+    """Request model for updating webhook subscription"""
+    name: Optional[str] = Field(None, description="Webhook subscription name")
+    description: Optional[str] = Field(None, description="Webhook description")
+    config: Optional[WebhookConfig] = Field(None, description="Webhook configuration")
+    enabled: Optional[bool] = Field(None, description="Whether webhook is enabled")
+
+class WebhookSubscriptionResponse(BaseModel):
+    """Response model for webhook subscription"""
+    subscription_id: str = Field(..., description="Unique subscription identifier")
+    name: str = Field(..., description="Webhook subscription name")
+    description: Optional[str] = Field(None, description="Webhook description")
+    config: WebhookConfig = Field(..., description="Webhook configuration")
+    enabled: bool = Field(..., description="Whether webhook is enabled")
+    tenant_id: str = Field(..., description="Tenant ID")
+    created_by: str = Field(..., description="User who created the webhook")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+
+    class Config:
+        from_attributes = True
+
+class WebhookSubscriptionListResponse(BaseModel):
+    """Response model for list of webhook subscriptions"""
+    subscriptions: List[WebhookSubscriptionResponse] = Field(..., description="List of webhook subscriptions")
+    total: int = Field(..., description="Total number of subscriptions")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of items per page")
+
+
+class Incident(BaseModel):
+    """Product outage incident model"""
+    id: str = Field(..., description="Unique incident identifier")
+    title: str = Field(..., description="Incident title")
+    description: str = Field(..., description="Detailed incident description")
+    status: IncidentStatus = Field(..., description="Current incident status")
+    severity: IncidentSeverity = Field(..., description="Incident severity level")
+    incident_type: IncidentType = Field(..., description="Type of incident")
+    
+    # Affected services and regions
+    affected_services: List[str] = Field(..., description="List of affected service names")
+    affected_regions: List[str] = Field(default=[], description="List of affected regions")
+    affected_components: List[str] = Field(default=[], description="List of affected components")
+    
+    # Timeline
+    start_time: datetime = Field(..., description="When the incident started")
+    end_time: Optional[datetime] = Field(None, description="When the incident was resolved")
+    estimated_resolution: Optional[datetime] = Field(None, description="Estimated time of resolution")
+    
+    # Updates and communication
+    updates: List["IncidentUpdate"] = Field(default=[], description="List of incident updates")
+    public_message: str = Field(..., description="Public-facing incident message")
+    internal_notes: Optional[str] = Field(None, description="Internal notes (not public)")
+    
+    # Metadata
+    created_by: str = Field(..., description="User who created the incident")
+    assigned_to: Optional[str] = Field(None, description="User assigned to handle the incident")
+    tags: List[str] = Field(default=[], description="Tags for categorization")
+    
+    # RSS and public visibility
+    is_public: bool = Field(default=True, description="Whether incident is publicly visible")
+    rss_enabled: bool = Field(default=True, description="Whether incident appears in RSS feed")
+    
+    # CloudEvent integration
+    event_id: Optional[str] = Field(None, description="Associated CloudEvent ID")
+    event_source: Optional[str] = Field(None, description="Source of the incident event")
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    @field_validator('end_time')
+    @classmethod
+    def validate_end_time(cls, v, info):
+        if v and 'start_time' in info.data and v <= info.data['start_time']:
+            raise ValueError('End time must be after start time')
+        return v
+    
+    @field_validator('estimated_resolution')
+    @classmethod
+    def validate_estimated_resolution(cls, v, info):
+        if v and 'start_time' in info.data and v <= info.data['start_time']:
+            raise ValueError('Estimated resolution must be after start time')
+        return v
+
+
+class IncidentUpdate(BaseModel):
+    """Individual update to an incident"""
+    id: str = Field(..., description="Unique update identifier")
+    incident_id: str = Field(..., description="ID of the incident being updated")
+    status: IncidentStatus = Field(..., description="New status after this update")
+    message: str = Field(..., description="Update message")
+    public_message: str = Field(..., description="Public-facing update message")
+    internal_notes: Optional[str] = Field(None, description="Internal notes (not public)")
+    
+    # Update metadata
+    update_type: str = Field(default="status_update", description="Type of update")
+    created_by: str = Field(..., description="User who created the update")
+    is_public: bool = Field(default=True, description="Whether update is publicly visible")
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Optional fields
+    affected_services: Optional[List[str]] = Field(None, description="Updated list of affected services")
+    affected_regions: Optional[List[str]] = Field(None, description="Updated list of affected regions")
+    estimated_resolution: Optional[datetime] = Field(None, description="Updated estimated resolution time")
+
+
+class IncidentCreate(BaseModel):
+    """Model for creating a new incident"""
+    title: str = Field(..., description="Incident title")
+    description: str = Field(..., description="Detailed incident description")
+    severity: IncidentSeverity = Field(..., description="Incident severity level")
+    incident_type: IncidentType = Field(..., description="Type of incident")
+    affected_services: List[str] = Field(..., description="List of affected service names")
+    affected_regions: List[str] = Field(default=[], description="List of affected regions")
+    affected_components: List[str] = Field(default=[], description="List of affected components")
+    start_time: datetime = Field(..., description="When the incident started")
+    estimated_resolution: Optional[datetime] = Field(None, description="Estimated time of resolution")
+    public_message: str = Field(..., description="Public-facing incident message")
+    internal_notes: Optional[str] = Field(None, description="Internal notes (not public)")
+    assigned_to: Optional[str] = Field(None, description="User assigned to handle the incident")
+    tags: List[str] = Field(default=[], description="Tags for categorization")
+    is_public: bool = Field(default=True, description="Whether incident is publicly visible")
+    rss_enabled: bool = Field(default=True, description="Whether incident appears in RSS feed")
+
+
+class IncidentUpdateRequest(BaseModel):
+    """Model for updating an incident"""
+    title: Optional[str] = Field(None, description="Incident title")
+    description: Optional[str] = Field(None, description="Detailed incident description")
+    status: Optional[IncidentStatus] = Field(None, description="Current incident status")
+    severity: Optional[IncidentSeverity] = Field(None, description="Incident severity level")
+    incident_type: Optional[IncidentType] = Field(None, description="Type of incident")
+    affected_services: Optional[List[str]] = Field(None, description="List of affected service names")
+    affected_regions: Optional[List[str]] = Field(None, description="List of affected regions")
+    affected_components: Optional[List[str]] = Field(None, description="List of affected components")
+    end_time: Optional[datetime] = Field(None, description="When the incident was resolved")
+    estimated_resolution: Optional[datetime] = Field(None, description="Estimated time of resolution")
+    public_message: Optional[str] = Field(None, description="Public-facing incident message")
+    internal_notes: Optional[str] = Field(None, description="Internal notes (not public)")
+    assigned_to: Optional[str] = Field(None, description="User assigned to handle the incident")
+    tags: Optional[List[str]] = Field(None, description="Tags for categorization")
+    is_public: Optional[bool] = Field(None, description="Whether incident is publicly visible")
+    rss_enabled: Optional[bool] = Field(None, description="Whether incident appears in RSS feed")
+
+
+class IncidentUpdateCreate(BaseModel):
+    """Model for creating a new incident update"""
+    status: IncidentStatus = Field(..., description="New status after this update")
+    message: str = Field(..., description="Update message")
+    public_message: str = Field(..., description="Public-facing update message")
+    internal_notes: Optional[str] = Field(None, description="Internal notes (not public)")
+    update_type: str = Field(default="status_update", description="Type of update")
+    is_public: bool = Field(default=True, description="Whether update is publicly visible")
+    affected_services: Optional[List[str]] = Field(None, description="Updated list of affected services")
+    affected_regions: Optional[List[str]] = Field(None, description="Updated list of affected regions")
+    estimated_resolution: Optional[datetime] = Field(None, description="Updated estimated resolution time")
+
+
+class IncidentResponse(BaseModel):
+    """Response model for incidents"""
+    incident: Incident
+    total_updates: int = Field(..., description="Total number of updates")
+    last_update: Optional[IncidentUpdate] = Field(None, description="Most recent update")
+
+
+class IncidentListResponse(BaseModel):
+    """Response model for incident lists"""
+    incidents: List[Incident]
+    total: int = Field(..., description="Total number of incidents")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of incidents per page")
+    has_next: bool = Field(..., description="Whether there are more pages")
+    has_prev: bool = Field(..., description="Whether there are previous pages")
+
+
+class RSSFeedConfig(BaseModel):
+    """Configuration for RSS feed generation"""
+    title: str = Field(default="Product Status", description="RSS feed title")
+    description: str = Field(default="Product outage and status updates", description="RSS feed description")
+    language: str = Field(default="en-US", description="RSS feed language")
+    ttl: int = Field(default=300, description="Time to live in minutes")
+    max_items: int = Field(default=50, description="Maximum number of items in feed")
+    include_resolved: bool = Field(default=False, description="Whether to include resolved incidents")
+    include_updates: bool = Field(default=True, description="Whether to include incident updates")
+
+
+# Update forward references
+Incident.model_rebuild()
+IncidentUpdate.model_rebuild()

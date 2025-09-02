@@ -94,14 +94,31 @@ export function EventSubscriptions() {
   const loadData = async () => {
     try {
       setLoading(true)
-      await Promise.all([
-        eventsApi.getEventSubscriptions()
-      ])
-      // Transform existing subscriptions to new format or start with empty array
-      setInputSources([])
+      console.log('Loading event subscriptions...')
+      
+      const subscriptionsResponse = await eventsApi.getEventSubscriptions()
+      console.log('Subscriptions response:', subscriptionsResponse)
+      
+      // Transform existing subscriptions to new format
+      if (subscriptionsResponse && subscriptionsResponse.subscriptions) {
+        console.log('Found subscriptions data:', subscriptionsResponse.subscriptions)
+        const transformedSources = subscriptionsResponse.subscriptions.map((sub: any) => ({
+          type: 'webhook' as InputSourceType, // Default to webhook for now
+          name: sub.name || sub.subscription_id,
+          description: sub.description || '',
+          enabled: sub.enabled !== false,
+          config: sub.config || {}
+        }))
+        console.log('Transformed sources:', transformedSources)
+        setInputSources(transformedSources)
+      } else {
+        console.log('No subscriptions data found, setting empty array')
+        setInputSources([])
+      }
     } catch (error) {
       console.error('Failed to load data:', error)
       showToast('Failed to load input sources', 'error')
+      setInputSources([])
     } finally {
       setLoading(false)
     }
@@ -123,9 +140,34 @@ export function EventSubscriptions() {
         return {
           endpoint: '/webhook/events',
           port: 8080,
+          address: '0.0.0.0',
           authentication: 'none',
+          auth_username: '',
+          auth_password: '',
+          auth_token: '',
+          auth_api_key_name: '',
+          auth_api_key_value: '',
+          auth_custom_expression: '',
           ssl_enabled: false,
-          rate_limit: 1000
+          ssl_cert_file: '',
+          ssl_key_file: '',
+          ssl_ca_file: '',
+          encoding: 'json',
+          method: 'POST',
+          path: '/',
+          strict_path: false,
+          path_key: 'path',
+          host_key: 'host',
+          headers: ['User-Agent', 'Content-Type'],
+          query_parameters: [],
+          response_code: 200,
+          rate_limit: 1000,
+          max_body_size: '10MB',
+          compression: 'auto',
+          cors_enabled: true,
+          cors_origins: ['*'],
+          cors_methods: ['POST', 'PUT', 'PATCH'],
+          cors_headers: ['Content-Type', 'Authorization']
         }
       case 'http_client':
         return {
@@ -139,8 +181,21 @@ export function EventSubscriptions() {
         return {
           topic: '',
           project_id: '',
-          credentials: {},
-          region: 'us-central1'
+          subscription_id: '',
+          authentication_method: 'service_account', // 'service_account' | 'workload_identity'
+          service_account_key: null, // Will be encrypted when stored
+          workload_identity: {
+            enabled: false,
+            service_account: '',
+            audience: 'https://pubsub.googleapis.com/google.pubsub.v1.Publisher'
+          },
+          region: 'us-central1',
+          ack_deadline_seconds: 20,
+          message_retention_duration: '7d',
+          enable_message_ordering: false,
+          filter: '',
+          dead_letter_topic: '',
+          max_retry_attempts: 5
         }
       case 'kinesis':
         return {
@@ -238,63 +293,465 @@ export function EventSubscriptions() {
     switch (type) {
       case 'webhook':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Endpoint Path</label>
-              <input
-                type="text"
-                value={config.endpoint || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  config: { ...prev.config, endpoint: e.target.value } 
-                }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="/webhook/events"
-              />
+          <div className="space-y-6">
+            {/* Basic Configuration */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Basic Configuration</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={config.address || '0.0.0.0'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, address: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.0.0.0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                  <input
+                    type="number"
+                    value={config.port || 8080}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, port: parseInt(e.target.value) } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="8080"
+                    min="1"
+                    max="65535"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Endpoint Path</label>
+                  <input
+                    type="text"
+                    value={config.endpoint || '/webhook/events'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, endpoint: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="/webhook/events"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">HTTP Method</label>
+                  <select
+                    value={config.method || 'POST'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, method: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="GET">GET</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
-              <input
-                type="number"
-                value={config.port || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  config: { ...prev.config, port: parseInt(e.target.value) } 
-                }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="8080"
-              />
+
+            {/* Authentication Configuration */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Authentication</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Authentication Type</label>
+                  <select
+                    value={config.authentication || 'none'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, authentication: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="none">None</option>
+                    <option value="basic">Basic Auth</option>
+                    <option value="bearer">Bearer Token</option>
+                    <option value="api_key">API Key</option>
+                    <option value="custom">Custom VRL Expression</option>
+                  </select>
+                </div>
+
+                {/* Basic Auth Fields */}
+                {config.authentication === 'basic' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                      <input
+                        type="text"
+                        value={config.auth_username || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, auth_username: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter username"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                      <input
+                        type="password"
+                        value={config.auth_password || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, auth_password: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter password"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Bearer Token Field */}
+                {config.authentication === 'bearer' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bearer Token</label>
+                    <input
+                      type="password"
+                      value={config.auth_token || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, auth_token: e.target.value } 
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter bearer token"
+                    />
+                  </div>
+                )}
+
+                {/* API Key Fields */}
+                {config.authentication === 'api_key' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Header Name</label>
+                      <input
+                        type="text"
+                        value={config.auth_api_key_name || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, auth_api_key_name: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="X-API-Key"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">API Key Value</label>
+                      <input
+                        type="password"
+                        value={config.auth_api_key_value || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, auth_api_key_value: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter API key"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom VRL Expression Field */}
+                {config.authentication === 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Custom VRL Expression</label>
+                    <textarea
+                      value={config.auth_custom_expression || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, auth_custom_expression: e.target.value } 
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="# Example: Check for custom header&#10;.headers.authorization == 'Vector my-token'"
+                      rows={4}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Write VRL code to validate requests. Access to: .headers, .path, .address
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Authentication</label>
-              <select
-                value={config.authentication || 'none'}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  config: { ...prev.config, authentication: e.target.value } 
-                }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="none">None</option>
-                <option value="basic">Basic Auth</option>
-                <option value="bearer">Bearer Token</option>
-                <option value="api_key">API Key</option>
-              </select>
+
+            {/* SSL/TLS Configuration */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">SSL/TLS Configuration</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={config.ssl_enabled || false}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, ssl_enabled: e.target.checked } 
+                      }))}
+                      className="mr-2"
+                    />
+                    Enable SSL/TLS
+                  </label>
+                </div>
+                
+                {config.ssl_enabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Certificate File</label>
+                      <input
+                        type="text"
+                        value={config.ssl_cert_file || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, ssl_cert_file: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="/path/to/cert.pem"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Private Key File</label>
+                      <input
+                        type="text"
+                        value={config.ssl_key_file || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, ssl_key_file: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="/path/to/key.pem"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">CA File (Optional)</label>
+                      <input
+                        type="text"
+                        value={config.ssl_ca_file || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, ssl_ca_file: e.target.value } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="/path/to/ca.pem"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SSL Enabled</label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={config.ssl_enabled || false}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    config: { ...prev.config, ssl_enabled: e.target.checked } 
-                  }))}
-                  className="mr-2"
-                />
-                Enable SSL/TLS
-              </label>
+
+            {/* Advanced Configuration */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Advanced Configuration</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Encoding</label>
+                  <select
+                    value={config.encoding || 'json'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, encoding: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="json">JSON</option>
+                    <option value="text">Text</option>
+                    <option value="binary">Binary</option>
+                    <option value="avro">Avro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Response Code</label>
+                  <input
+                    type="number"
+                    value={config.response_code || 200}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, response_code: parseInt(e.target.value) } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="100"
+                    max="599"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Body Size</label>
+                  <input
+                    type="text"
+                    value={config.max_body_size || '10MB'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, max_body_size: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="10MB"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rate Limit (req/min)</label>
+                  <input
+                    type="number"
+                    value={config.rate_limit || 1000}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, rate_limit: parseInt(e.target.value) } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                    max="10000"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Headers to Capture</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(config.headers) ? config.headers.join(', ') : ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, headers: e.target.value.split(',').map(h => h.trim()).filter(h => h) } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="User-Agent, Content-Type, X-Forwarded-For"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Comma-separated list of headers to capture</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Query Parameters to Capture</label>
+                  <input
+                    type="text"
+                    value={Array.isArray(config.query_parameters) ? config.query_parameters.join(', ') : ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, query_parameters: e.target.value.split(',').map(p => p.trim()).filter(p => p) } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="source, environment, version"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Comma-separated list of query parameters to capture</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Path Key</label>
+                    <input
+                      type="text"
+                      value={config.path_key || 'path'}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, path_key: e.target.value } 
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="path"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Host Key</label>
+                    <input
+                      type="text"
+                      value={config.host_key || 'host'}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, host_key: e.target.value } 
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="host"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={config.strict_path || false}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, strict_path: e.target.checked } 
+                      }))}
+                      className="mr-2"
+                    />
+                    Strict Path Matching
+                  </label>
+                  <p className="text-xs text-gray-500">Only accept requests on exact path match</p>
+                </div>
+              </div>
+            </div>
+
+            {/* CORS Configuration */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">CORS Configuration</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={config.cors_enabled || false}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, cors_enabled: e.target.checked } 
+                      }))}
+                      className="mr-2"
+                    />
+                    Enable CORS
+                  </label>
+                </div>
+                
+                {config.cors_enabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Allowed Origins</label>
+                      <input
+                        type="text"
+                        value={Array.isArray(config.cors_origins) ? config.cors_origins.join(', ') : ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, cors_origins: e.target.value.split(',').map(o => o.trim()).filter(o => o) } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="*, https://example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Allowed Methods</label>
+                      <input
+                        type="text"
+                        value={Array.isArray(config.cors_methods) ? config.cors_methods.join(', ') : ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, cors_methods: e.target.value.split(',').map(m => m.trim()).filter(m => m) } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="POST, PUT, PATCH"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Allowed Headers</label>
+                      <input
+                        type="text"
+                        value={Array.isArray(config.cors_headers) ? config.cors_headers.join(', ') : ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { ...prev.config, cors_headers: e.target.value.split(',').map(h => h.trim()).filter(h => h) } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Content-Type, Authorization"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )
@@ -377,6 +834,169 @@ export function EventSubscriptions() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subscription ID</label>
+              <input
+                type="text"
+                value={config.subscription_id || ''}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  config: { ...prev.config, subscription_id: e.target.value } 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="cloud-events-subscription"
+              />
+            </div>
+            
+            {/* Authentication Method Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Authentication Method</label>
+              <select
+                value={config.authentication_method || 'service_account'}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  config: { 
+                    ...prev.config, 
+                    authentication_method: e.target.value,
+                    // Reset service account key when switching to workload identity
+                    service_account_key: e.target.value === 'workload_identity' ? null : prev.config.service_account_key
+                  } 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="service_account">Service Account Key</option>
+                <option value="workload_identity">Workload Identity</option>
+              </select>
+            </div>
+
+            {/* Service Account Key Upload */}
+            {config.authentication_method === 'service_account' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Account Key (JSON)
+                  <span className="text-xs text-gray-500 ml-2">Will be encrypted when stored</span>
+                </label>
+                <div className="space-y-2">
+                  <textarea
+                    value={config.service_account_key || ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, service_account_key: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    placeholder="Paste your service account JSON key here..."
+                    rows={8}
+                  />
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              config: { ...prev.config, service_account_key: content } 
+                            }))
+                          }
+                          reader.readAsText(file)
+                        }
+                      }}
+                      className="text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ 
+                        ...prev, 
+                        config: { ...prev.config, service_account_key: '' } 
+                      }))}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Workload Identity Configuration */}
+            {config.authentication_method === 'workload_identity' && (
+              <div className="space-y-4 p-4 bg-blue-50 rounded-md border border-blue-200">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="workload_identity_enabled"
+                    checked={config.workload_identity?.enabled || false}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { 
+                        ...prev.config, 
+                        workload_identity: { 
+                          ...prev.config.workload_identity, 
+                          enabled: e.target.checked 
+                        } 
+                      } 
+                    }))}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="workload_identity_enabled" className="text-sm font-medium text-gray-700">
+                    Enable Workload Identity
+                  </label>
+                </div>
+                
+                {config.workload_identity?.enabled && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Service Account Email</label>
+                      <input
+                        type="email"
+                        value={config.workload_identity?.service_account || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { 
+                            ...prev.config, 
+                            workload_identity: { 
+                              ...prev.config.workload_identity, 
+                              service_account: e.target.value 
+                            } 
+                          } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="service-account@project.iam.gserviceaccount.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Audience</label>
+                      <input
+                        type="text"
+                        value={config.workload_identity?.audience || 'https://pubsub.googleapis.com/google.pubsub.v1.Publisher'}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          config: { 
+                            ...prev.config, 
+                            workload_identity: { 
+                              ...prev.config.workload_identity, 
+                              audience: e.target.value 
+                            } 
+                          } 
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://pubsub.googleapis.com/google.pubsub.v1.Publisher"
+                      />
+                    </div>
+                  </>
+                )}
+                
+                <div className="text-xs text-blue-600">
+                  <p>ℹ️ Workload Identity allows the service to use the default credentials from the environment.</p>
+                  <p>Make sure your Kubernetes cluster has Workload Identity enabled and properly configured.</p>
+                </div>
+              </div>
+            )}
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
               <input
                 type="text"
@@ -388,6 +1008,111 @@ export function EventSubscriptions() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="us-central1"
               />
+            </div>
+
+            {/* Advanced Pub/Sub Configuration */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Advanced Configuration</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ack Deadline (seconds)</label>
+                  <input
+                    type="number"
+                    value={config.ack_deadline_seconds || 20}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, ack_deadline_seconds: parseInt(e.target.value) || 20 } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="10"
+                    max="600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Message Retention</label>
+                  <select
+                    value={config.message_retention_duration || '7d'}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, message_retention_duration: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="1d">1 day</option>
+                    <option value="3d">3 days</option>
+                    <option value="7d">7 days</option>
+                    <option value="14d">14 days</option>
+                    <option value="30d">30 days</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="enable_message_ordering"
+                    checked={config.enable_message_ordering || false}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, enable_message_ordering: e.target.checked } 
+                    }))}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="enable_message_ordering" className="text-sm font-medium text-gray-700">
+                    Enable Message Ordering
+                  </label>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Message Filter (optional)</label>
+                  <input
+                    type="text"
+                    value={config.filter || ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, filter: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="attributes.event_type = 'cloud_alert'"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use Cloud Pub/Sub filter syntax to process only specific messages
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dead Letter Topic (optional)</label>
+                  <input
+                    type="text"
+                    value={config.dead_letter_topic || ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, dead_letter_topic: e.target.value } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="dead-letter-topic"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Failed messages will be sent to this topic for retry processing
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Retry Attempts</label>
+                  <input
+                    type="number"
+                    value={config.max_retry_attempts || 5}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      config: { ...prev.config, max_retry_attempts: parseInt(e.target.value) || 5 } 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                    max="10"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )

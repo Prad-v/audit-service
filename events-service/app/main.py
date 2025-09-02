@@ -16,12 +16,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.database import init_db, close_db
+from app.api.v1 import subscriptions, pubsub, webhook, incidents
 from app.api.v1.events import router as events_router
 from app.api.v1.providers import router as providers_router
 from app.api.v1.subscriptions import router as subscriptions_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.outages import router as outages_router
 from app.api.v1.processors import router as processors_router
+from app.api.v1.pubsub import router as pubsub_router
+from app.api.v1.webhook import router as webhook_router
 from app.services.background_tasks import background_task_manager
 
 # Configure logging
@@ -109,6 +112,9 @@ app.include_router(subscriptions_router, prefix="/api/v1/subscriptions", tags=["
 app.include_router(alerts_router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(outages_router, prefix="/api/v1", tags=["outage-monitoring"])
 app.include_router(processors_router, prefix="/api/v1", tags=["event-processors"])
+app.include_router(pubsub_router, prefix="/api/v1/pubsub", tags=["pubsub"])
+app.include_router(webhook_router, prefix="/api/v1", tags=["webhook"])
+app.include_router(incidents.router, prefix="/api/v1", tags=["incidents"])
 
 
 if __name__ == "__main__":
