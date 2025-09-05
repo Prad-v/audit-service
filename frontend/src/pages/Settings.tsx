@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { Cloud, Settings as SettingsIcon, Bot, Zap } from 'lucide-react'
+import { Cloud, Settings as SettingsIcon, Bot, Zap, ToggleLeft, Monitor } from 'lucide-react'
 import { CloudProjects } from './CloudProjects'
 import LLMProviders from './LLMProviders'
 import { Integrations } from './Integrations'
+import { FeatureFlags } from '../components/FeatureFlags'
+import { AppSettings } from '../components/AppSettings'
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext'
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<'cloud-projects' | 'llm-providers' | 'integrations'>('cloud-projects')
+  const [activeTab, setActiveTab] = useState<'cloud-projects' | 'llm-providers' | 'integrations' | 'feature-flags' | 'app-settings'>('cloud-projects')
 
   const tabs = [
     {
@@ -25,6 +28,18 @@ export function Settings() {
       name: 'Integrations',
       icon: Zap,
       description: 'Configure third-party integrations and external services'
+    },
+    {
+      id: 'feature-flags',
+      name: 'Feature Flags',
+      icon: ToggleLeft,
+      description: 'Enable or disable UI features and capabilities'
+    },
+    {
+      id: 'app-settings',
+      name: 'Application Settings',
+      icon: Monitor,
+      description: 'Customize application name and global settings'
     }
   ]
 
@@ -99,6 +114,18 @@ export function Settings() {
               </p>
             </div>
             <Integrations />
+          </div>
+        )}
+        
+        {activeTab === 'feature-flags' && (
+          <div>
+            <FeatureFlags />
+          </div>
+        )}
+        
+        {activeTab === 'app-settings' && (
+          <div>
+            <AppSettings />
           </div>
         )}
       </div>

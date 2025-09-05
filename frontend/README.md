@@ -1,4 +1,4 @@
-# Audit Log Framework - Frontend
+# Incident Manager - Frontend
 
 A modern React application for managing and viewing audit logs, built with Vite, TypeScript, and Tailwind CSS.
 

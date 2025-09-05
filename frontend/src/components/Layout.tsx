@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare, Settings, AlertTriangle, Database, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { auditApi } from '@/lib/api'
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext'
+import { useAppSettings } from '../contexts/AppSettingsContext'
 
 interface LayoutProps {
   children: ReactNode
@@ -25,6 +27,8 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null)
   const [isHealthLoading, setIsHealthLoading] = useState(true)
+  const { isFeatureEnabled } = useFeatureFlags()
+  const { getAppSetting } = useAppSettings()
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -44,19 +48,27 @@ export function Layout({ children }: LayoutProps) {
     return () => clearInterval(interval)
   }, [])
 
-  const navigation = [
+  const baseNavigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Audit Logs', href: '/audit-logs', icon: FileText },
     { name: 'Create Event', href: '/create-event', icon: Plus },
     { name: 'Ask Me', href: '/mcp-query', icon: MessageSquare },
     { name: 'Settings', href: '/settings', icon: Settings },
     { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
-    { name: 'Event Framework', href: '/event-framework', icon: Database },
-    { name: 'Event Pipeline Builder', href: '/event-pipeline-builder', icon: Database },
+  ]
+
+  const featureFlaggedNavigation = [
+    ...(isFeatureEnabled('eventFramework') ? [{ name: 'Event Framework', href: '/event-framework', icon: Database }] : []),
+    ...(isFeatureEnabled('eventPipeline') ? [{ name: 'Event Pipeline Builder', href: '/event-pipeline-builder', icon: Database }] : []),
+  ]
+
+  const otherNavigation = [
     { name: 'Cloud Provider Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
     { name: 'Incident Management', href: '/product-status', icon: AlertTriangle },
     { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   ]
+
+  const navigation = [...baseNavigation, ...featureFlaggedNavigation, ...otherNavigation]
 
   const getHealthColor = (status: string) => {
     switch (status) {
@@ -78,7 +90,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex items-center">
               <Activity className="h-8 w-8 text-primary-600" />
               <h1 className="ml-3 text-xl font-semibold text-gray-900">
-                Audit Log Framework
+                {getAppSetting('appName')}
               </h1>
             </div>
             <div className="flex items-center space-x-4">

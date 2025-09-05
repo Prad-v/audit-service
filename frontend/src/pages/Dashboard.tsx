@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Activity, FileText, Plus, Clock, BookOpen, Database, Zap, MessageSquare, TrendingUp, BarChart3, Cpu, HardDrive, Settings } from 'lucide-react'
 import { auditApi, type AuditEvent, type TopEventType } from '@/lib/api'
+import { useAppSettings } from '../contexts/AppSettingsContext'
 
 export function Dashboard() {
+  const { getAppSetting } = useAppSettings()
   const { data: healthData } = useQuery({
     queryKey: ['health'],
     queryFn: auditApi.getHealth,
@@ -81,7 +83,7 @@ export function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome to the Audit Log Framework dashboard</p>
+        <p className="text-gray-600">Welcome to the {getAppSetting('appName')} dashboard</p>
       </div>
 
       {/* Stats */}

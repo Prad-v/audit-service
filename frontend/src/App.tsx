@@ -12,25 +12,43 @@ import EventPipelineBuilder from './pages/EventPipelineBuilder'
 import { Alerts } from './pages/Alerts'
 import { OutageMonitoring } from './pages/OutageMonitoring'
 import ProductStatus from './pages/ProductStatus'
+import { FeatureFlagsProvider, useFeatureFlags } from './contexts/FeatureFlagsContext'
+import { AppSettingsProvider } from './contexts/AppSettingsContext'
+
+function AppRoutes() {
+  const { isFeatureEnabled } = useFeatureFlags();
+
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/audit-logs" element={<AuditLogs />} />
+      <Route path="/create-event" element={<CreateEvent />} />
+      <Route path="/events/:id" element={<EventDetails />} />
+      <Route path="/mcp-query" element={<MCPQuery />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route path="/alert-management" element={<AlertManagement />} />
+      {isFeatureEnabled('eventFramework') && (
+        <Route path="/event-framework" element={<EventFramework />} />
+      )}
+      {isFeatureEnabled('eventPipeline') && (
+        <Route path="/event-pipeline-builder" element={<EventPipelineBuilder />} />
+      )}
+      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/outage-monitoring" element={<OutageMonitoring />} />
+      <Route path="/product-status" element={<ProductStatus />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/audit-logs" element={<AuditLogs />} />
-        <Route path="/create-event" element={<CreateEvent />} />
-        <Route path="/events/:id" element={<EventDetails />} />
-        <Route path="/mcp-query" element={<MCPQuery />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/alert-management" element={<AlertManagement />} />
-        <Route path="/event-framework" element={<EventFramework />} />
-        <Route path="/event-pipeline-builder" element={<EventPipelineBuilder />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/outage-monitoring" element={<OutageMonitoring />} />
-        <Route path="/product-status" element={<ProductStatus />} />
-      </Routes>
-    </Layout>
+    <AppSettingsProvider>
+      <FeatureFlagsProvider>
+        <Layout>
+          <AppRoutes />
+        </Layout>
+      </FeatureFlagsProvider>
+    </AppSettingsProvider>
   )
 }
 
