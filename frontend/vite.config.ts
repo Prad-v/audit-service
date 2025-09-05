@@ -13,6 +13,9 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
+    hmr: {
+      overlay: true
+    },
     proxy: {
       '/api/v1/alerts': {
         target: 'http://alerting:8001',
@@ -51,27 +54,27 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/v1/outages': {
-        target: 'http://host.docker.internal:8003',
+        target: 'http://events:8003',
         changeOrigin: true,
       },
       '/api/v1/incidents': {
-        target: 'http://host.docker.internal:8003',
+        target: 'http://events:8003',
         changeOrigin: true,
       },
       '/api/v1/processors': {
-        target: 'http://host.docker.internal:8003',
+        target: 'http://events:8003',
         changeOrigin: true,
       },
       '/api/v1/subscriptions': {
-        target: 'http://host.docker.internal:8003',
+        target: 'http://events:8003',
         changeOrigin: true,
       },
       '/api/v1/events': {
-        target: 'http://host.docker.internal:8003',
+        target: 'http://events:8003',
         changeOrigin: true,
       },
       '/api/v1/pubsub': {
-        target: 'http://host.docker.internal:8003',
+        target: 'http://events:8003',
         changeOrigin: true,
       },
       '/api/v1/webhook': {

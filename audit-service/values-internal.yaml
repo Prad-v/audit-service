@@ -1,0 +1,14 @@
+# Example values for using internal database subcharts
+# This file shows how to configure the chart to use built-in PostgreSQL and NATS services
+
+# Use development namespace
+namespace:
+  create: true
+  name: audit-service-fresh
+  annotations: {}
+  labels:
+    environment: development
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: namespace
+
+# Database Configuration - Use Internal Subcharts

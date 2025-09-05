@@ -13,6 +13,7 @@ app:
     frontend: 2
     worker: 2
     alerting: 3
+    events: 2
 
 namespace:
   name: audit-service
@@ -66,8 +67,22 @@ alerting:
   env:
     ENVIRONMENT: "production"
     LOG_LEVEL: "INFO"
-    ALERTING_DATABASE_URL: "postgresql+asyncpg://audit_user:audit_password@postgres-service:5432/alerting_db"
     ALERTING_API_KEY: "prod-api-key-123"
+
+events:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"
+    EVENTS_API_KEY: "prod-events-api-key-123"
 
 hpa:
   backend:
@@ -82,6 +97,10 @@ hpa:
     enabled: true
     minReplicas: 3
     maxReplicas: 8
+  events:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
 
 ingress:
   enabled: true
@@ -103,6 +122,11 @@ ingress:
           service:
             name: audit-service-alerting
             port: 8001
+        - path: /events
+          pathType: Prefix
+          service:
+            name: audit-service-events
+            port: 8003
 
 resources:
   quota:

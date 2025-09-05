@@ -1,360 +1,381 @@
 # Audit Service Helm Chart
 
-A comprehensive Helm chart for deploying the Audit Service to Kubernetes clusters.
+A comprehensive Helm chart for deploying the Audit Service with flexible database configuration options.
 
-## Overview
+## Features
 
-This Helm chart deploys a complete audit logging service with the following components:
-
-- **Backend API**: FastAPI-based REST API for audit event ingestion and retrieval
-- **Frontend**: React-based web interface for audit log management
-- **Worker**: Background processing for audit event processing
-- **Alerting Service**: Policy-based alerting with multiple providers (PagerDuty, Slack, Webhook, Email)
-- **Monitoring**: Prometheus metrics and Grafana dashboards
-- **Security**: RBAC, network policies, and security contexts
+- **Flexible Database Configuration**: Choose between internal subcharts or external services
+- **PostgreSQL Support**: Built-in PostgreSQL subchart or connect to external database
+- **NATS Integration**: Built-in NATS subchart or connect to external message broker
+- **Redis Support**: Connect to external Redis cache
+- **Production Ready**: Includes monitoring, security, and scaling configurations
 
 ## Prerequisites
 
 - Kubernetes 1.19+
 - Helm 3.0+
-- Ingress controller (nginx, istio, etc.)
-- Cert-manager (for TLS certificates)
-- Prometheus Operator (for monitoring)
+- Storage class for persistent volumes (if using internal databases)
 
 ## Quick Start
 
-### 1. Add the Helm repository
+### 1. Add Required Helm Repositories
 
 ```bash
-helm repo add audit-service https://your-helm-repo.com
+# Add Bitnami repository for PostgreSQL
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
+# Add NATS repository
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+
+# Update repositories
 helm repo update
 ```
 
-### 2. Install the chart
+### 2. Install with Internal Databases (Default)
 
 ```bash
-# Development
-helm install audit-service-dev audit-service/audit-service \
-  --namespace audit-service-dev \
-  --create-namespace \
-  -f values/values-dev.yaml
-
-# Staging
-helm install audit-service-staging audit-service/audit-service \
-  --namespace audit-service-staging \
-  --create-namespace \
-  -f values/values-staging.yaml
-
-# Production
-helm install audit-service audit-service/audit-service \
+# Install with internal PostgreSQL and NATS subcharts
+helm install audit-service ./audit-service \
   --namespace audit-service \
-  --create-namespace \
-  -f values/values-prod.yaml
+  --create-namespace
 ```
 
-### 3. Configure secrets
-
-Create a secret with your sensitive configuration:
+### 3. Install with External Databases
 
 ```bash
-kubectl create secret generic audit-service-secret \
-  --from-literal=DATABASE_URL="your-database-url" \
-  --from-literal=JWT_SECRET_KEY="your-jwt-secret" \
-  --from-literal=REDIS_URL="your-redis-url" \
-  --from-literal=NATS_URL="your-nats-url" \
-  --from-file=GOOGLE_CREDENTIALS=path/to/credentials.json
+# Install using external database services
+helm install audit-service ./audit-service \
+  --namespace audit-service \
+  --create-namespace \
+  --values values-external.yaml
 ```
 
 ## Configuration
 
-### Values Files
+### PostgreSQL Credentials Configuration
 
-The chart includes environment-specific values files:
+**⚠️ IMPORTANT: Security Best Practices**
 
-- `values.yaml` - Default values
-- `values/values-dev.yaml` - Development environment
-- `values/values-staging.yaml` - Staging environment
-- `values/values-prod.yaml` - Production environment
+The Helm chart now requires proper PostgreSQL credentials configuration using Kubernetes secrets. Hardcoded passwords are no longer supported.
 
-### Key Configuration Options
+#### Quick Setup
 
-#### Image Configuration
+Use the provided script to create PostgreSQL secrets:
 
-```yaml
-image:
-  repository: gcr.io/PROJECT_ID/audit-service
-  tag: latest
-  pullPolicy: Always
-  frontend:
-    repository: gcr.io/PROJECT_ID/audit-service-frontend
-    tag: latest
+```bash
+# Create secrets for internal PostgreSQL
+./scripts/create-postgresql-secrets.sh -n audit-service
+
+# Create secrets for external PostgreSQL
+./scripts/create-postgresql-secrets.sh -e -n audit-service
 ```
 
-#### Replica Configuration
+#### Manual Secret Creation
 
-```yaml
-app:
-  replicas:
-    backend: 3
-    frontend: 2
-    worker: 2
-    alerting: 2
+```bash
+# For internal PostgreSQL
+kubectl create secret generic postgresql-credentials \
+  --namespace=audit-service \
+  --from-literal=postgres-password="your-superuser-password" \
+  --from-literal=username="audit_user" \
+  --from-literal=password="your-audit-user-password" \
+  --from-literal=database="audit_logs"
+
+# For external PostgreSQL
+kubectl create secret generic external-postgresql-credentials \
+  --namespace=audit-service \
+  --from-literal=password="your-external-password"
 ```
 
-#### Resource Limits
+For detailed configuration instructions, see [PostgreSQL Credentials Documentation](docs/postgresql-credentials.md).
+
+### Database Configuration Options
+
+The chart supports two deployment modes:
+
+#### Mode 1: Internal Subcharts (Default)
+
+Uses built-in PostgreSQL and NATS subcharts for self-contained deployment.
 
 ```yaml
-backend:
-  resources:
-    requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
+database:
+  postgresql:
+    enabled: true  # Use internal PostgreSQL
+    internal:
+      postgresql:
+        auth:
+          username: "audit_user"
+          password: "audit_password"
+          database: "audit_logs"
+        primary:
+          persistence:
+            enabled: true
+            size: 10Gi
+  
+  nats:
+    enabled: true  # Use internal NATS
+    internal:
+      nats:
+        jetstream:
+          enabled: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
 ```
 
-#### Ingress Configuration
+#### Mode 2: External Services
+
+Connect to existing PostgreSQL and NATS services.
 
 ```yaml
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: audit.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service:
-            name: audit-service-frontend
-            port: 80
-        - path: /api
-          pathType: Prefix
-          service:
-            name: audit-service-backend
-            port: 8000
-        - path: /alerts
-          pathType: Prefix
-          service:
-            name: audit-service-alerting
-            port: 8001
+database:
+  postgresql:
+    enabled: false  # Disable internal PostgreSQL
+    external:
+      host: "your-postgres-host"
+      port: 5432
+      database: "audit_logs"
+      username: "audit_user"
+      password: "your-secure-password"
+  
+  nats:
+    enabled: false  # Disable internal NATS
+    external:
+      host: "your-nats-host"
+      port: 4222
+      jetstream:
+        enabled: true
 ```
 
-#### Monitoring Configuration
+### Redis Configuration
+
+Redis is always external (no subchart included):
 
 ```yaml
-monitoring:
-  enabled: true
-  serviceMonitor:
+database:
+  redis:
     enabled: true
-    interval: 30s
-    path: /metrics
-    port: metrics
+    host: "your-redis-host"
+    port: 6379
+    password: "your-redis-password"
+    database: 0
 ```
 
-#### Alerting Configuration
+## Values Reference
+
+### Global Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `global.environment` | Environment name | `production` |
+| `global.imageRegistry` | Global image registry | `""` |
+| `global.imagePullSecrets` | Global image pull secrets | `[]` |
+
+### Database Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `database.postgresql.enabled` | Enable PostgreSQL subchart | `true` |
+| `database.postgresql.internal.*` | Internal PostgreSQL configuration | See values.yaml |
+| `database.postgresql.external.*` | External PostgreSQL configuration | See values.yaml |
+| `database.nats.enabled` | Enable NATS subchart | `true` |
+| `database.nats.internal.*` | Internal NATS configuration | See values.yaml |
+| `database.nats.external.*` | External NATS configuration | See values.yaml |
+| `database.redis.*` | Redis configuration | See values.yaml |
+
+### Application Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `backend.replicas` | Backend service replicas | `3` |
+| `frontend.replicas` | Frontend service replicas | `2` |
+| `worker.replicas` | Worker service replicas | `2` |
+| `alerting.replicas` | Alerting service replicas | `2` |
+
+## Examples
+
+### Example 1: Production with External Databases
 
 ```yaml
-alerting:
-  enabled: true
-  replicas: 2
-  resources:
-    requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-  env:
-    ALERTING_DATABASE_URL: "postgresql+asyncpg://user:pass@host:5432/alerting_db"
-    ALERTING_API_KEY: "your-api-key"
-    ALERTING_MAX_ALERTS_PER_HOUR: "100"
-    ALERTING_DEFAULT_THROTTLE_MINUTES: "5"
+# values-prod.yaml
+global:
+  environment: production
+  imageRegistry: "gcr.io/your-project"
+
+database:
+  postgresql:
+    enabled: false
+    external:
+      host: "prod-postgres.example.com"
+      port: 5432
+      database: "audit_logs_prod"
+      username: "audit_user"
+      password: "{{ .Values.secrets.postgresPassword }}"
+  
+  nats:
+    enabled: false
+    external:
+      host: "prod-nats.example.com"
+      port: 4222
+  
+  redis:
+    enabled: true
+    host: "prod-redis.example.com"
+    port: 6379
+    password: "{{ .Values.secrets.redisPassword }}"
+
+secrets:
+  postgresPassword: "your-secure-password"
+  redisPassword: "your-redis-password"
+  jwtSecretKey: "your-jwt-secret"
 ```
 
-## Architecture
+### Example 2: Development with Internal Databases
 
-### Components
+```yaml
+# values-dev.yaml
+global:
+  environment: development
 
-1. **Backend Deployment**
-   - FastAPI application
-   - REST API endpoints
-   - Database integration
-   - Authentication/Authorization
-
-2. **Frontend Deployment**
-   - React application
-   - Nginx web server
-   - Static file serving
-   - API proxy
-
-3. **Worker Deployment**
-   - Background processing
-   - Event processing
-   - Batch operations
-
-4. **Alerting Deployment**
-   - Policy-based alerting
-   - Multiple provider support
-   - Real-time event processing
-   - Throttling and suppression
-
-5. **Services**
-   - Backend service (ClusterIP)
-   - Frontend service (ClusterIP)
-   - Alerting service (ClusterIP)
-   - Metrics endpoints
-
-5. **Ingress**
-   - SSL termination
-   - Path-based routing
-   - Rate limiting
-
-6. **HPA (Horizontal Pod Autoscaler)**
-   - CPU-based scaling
-   - Memory-based scaling
-   - Configurable limits
-
-### Security Features
-
-- **Pod Security Contexts**: Non-root containers
-- **RBAC**: Role-based access control
-- **Network Policies**: Pod-to-pod communication
-- **Secrets Management**: Secure credential storage
-- **TLS**: End-to-end encryption
-
-## Deployment
-
-### Development
-
-```bash
-helm install audit-service-dev audit-service/audit-service \
-  --namespace audit-service-dev \
-  --create-namespace \
-  -f values/values-dev.yaml \
-  --set image.tag=dev \
-  --set backend.replicas=1 \
-  --set frontend.replicas=1
-```
-
-### Staging
-
-```bash
-helm install audit-service-staging audit-service/audit-service \
-  --namespace audit-service-staging \
-  --create-namespace \
-  -f values/values-staging.yaml \
-  --set image.tag=staging
-```
-
-### Production
-
-```bash
-helm install audit-service audit-service/audit-service \
-  --namespace audit-service \
-  --create-namespace \
-  -f values/values-prod.yaml \
-  --set image.tag=latest
+database:
+  postgresql:
+    enabled: true
+    internal:
+      postgresql:
+        auth:
+          username: "dev_user"
+          password: "dev_password"
+          database: "audit_logs_dev"
+        primary:
+          persistence:
+            size: 5Gi
+  
+  nats:
+    enabled: true
+    internal:
+      nats:
+        jetstream:
+          enabled: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+  
+  redis:
+    enabled: true
+    host: "redis-service"
+    port: 6379
 ```
 
 ## Upgrading
 
+### From Previous Versions
+
+If upgrading from a version without database subcharts:
+
+1. **Backup your data** if using external databases
+2. **Review the new configuration** options
+3. **Update your values** to use the new database configuration
+4. **Upgrade the chart**:
+
 ```bash
-# Upgrade to a new version
-helm upgrade audit-service audit-service/audit-service \
+helm upgrade audit-service ./audit-service \
   --namespace audit-service \
-  -f values/values-prod.yaml \
-  --set image.tag=new-version
-
-# Rollback if needed
-helm rollback audit-service 1 --namespace audit-service
+  --values your-values.yaml
 ```
-
-## Uninstalling
-
-```bash
-helm uninstall audit-service --namespace audit-service
-kubectl delete namespace audit-service
-```
-
-## Monitoring
-
-### Metrics
-
-The application exposes Prometheus metrics at `/metrics`:
-
-- HTTP request metrics
-- Database connection metrics
-- Application-specific metrics
-- Custom business metrics
-
-### Alerts
-
-Configured Prometheus rules for:
-
-- High error rates
-- Service availability
-- Resource utilization
-- Custom business alerts
-
-### Dashboards
-
-Grafana dashboards are automatically provisioned for:
-
-- Application performance
-- Infrastructure metrics
-- Business metrics
-- Custom visualizations
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Image Pull Errors**
-   ```bash
-   kubectl describe pod -n audit-service
-   kubectl logs -n audit-service deployment/audit-service-backend
-   ```
+#### 1. Database Connection Failures
 
-2. **Database Connection Issues**
-   ```bash
-   kubectl exec -n audit-service deployment/audit-service-backend -- env | grep DATABASE
-   ```
+**Symptoms**: Pods in CrashLoopBackOff with database connection errors
 
-3. **Ingress Issues**
-   ```bash
-   kubectl describe ingress -n audit-service
-   kubectl get events -n audit-service
-   ```
+**Solutions**:
+- Verify database hostnames are resolvable
+- Check database credentials
+- Ensure database services are accessible from the cluster
 
-### Debug Commands
+#### 2. Subchart Installation Failures
+
+**Symptoms**: Helm install fails with subchart errors
+
+**Solutions**:
+- Ensure Helm repositories are added and updated
+- Check subchart versions compatibility
+- Verify storage class exists for persistent volumes
+
+#### 3. Configuration Mismatch
+
+**Symptoms**: Services start but can't connect to databases
+
+**Solutions**:
+- Verify ConfigMap contains correct database URLs
+- Check environment variables in pod descriptions
+- Ensure database configuration matches actual services
+
+### Debugging Commands
 
 ```bash
 # Check pod status
 kubectl get pods -n audit-service
 
-# Check service endpoints
-kubectl get endpoints -n audit-service
-
-# Check ingress status
-kubectl get ingress -n audit-service
-
-# Check HPA status
-kubectl get hpa -n audit-service
-
-# View logs
+# View pod logs
 kubectl logs -n audit-service deployment/audit-service-backend
-kubectl logs -n audit-service deployment/audit-service-frontend
+
+# Check ConfigMap
+kubectl get configmap -n audit-service
+kubectl describe configmap audit-service-config -n audit-service
+
+# Check services
+kubectl get services -n audit-service
+
+# Check persistent volumes
+kubectl get pvc -n audit-service
 ```
 
+## Security Considerations
+
+### Secrets Management
+
+- **Never commit secrets** to version control
+- Use **external secret management** (e.g., Sealed Secrets, External Secrets Operator)
+- **Rotate secrets** regularly
+- Use **RBAC** to limit access to secrets
+
+### Network Security
+
+- **Enable TLS** for database connections in production
+- Use **network policies** to restrict pod-to-pod communication
+- **Isolate database services** in separate namespaces if possible
+
+### Database Security
+
+- **Use strong passwords** for database users
+- **Limit database permissions** to minimum required
+- **Enable SSL/TLS** for database connections
+- **Regular security updates** for database images
+
+## Support
+
+For issues and questions:
+
+1. Check the [troubleshooting section](#troubleshooting)
+2. Review [GitHub issues](https://github.com/your-org/audit-service/issues)
+3. Contact the Audit Service team
+
 ## Contributing
+
+Contributions are welcome! Please:
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test with different environments
+4. Add tests
 5. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](../../LICENSE) file for details.

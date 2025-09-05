@@ -87,4 +87,35 @@ spec:
       target:
         type: Utilization
         averageUtilization: {{ .Values.hpa.alerting.targetMemoryUtilizationPercentage }}
+---
+{{- end }}
+{{- if .Values.hpa.events.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "audit-service.hpaName" . }}-events
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "audit-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: events
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "audit-service.fullname" . }}-events
+  minReplicas: {{ .Values.hpa.events.minReplicas }}
+  maxReplicas: {{ .Values.hpa.events.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.hpa.events.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.hpa.events.targetMemoryUtilizationPercentage }}
 {{- end }}

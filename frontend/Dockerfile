@@ -20,7 +20,7 @@ COPY index.html ./
 # Build the application with environment variable
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
-RUN npm run build
+RUN npx vite build
 
 # Production stage
 FROM nginx:alpine
@@ -30,6 +30,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
+
+# Remove default nginx configuration
+RUN rm -f /etc/nginx/conf.d/default.conf
 
 # Copy documentation
 COPY docs /usr/share/nginx/docs

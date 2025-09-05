@@ -189,7 +189,11 @@ Create backend image name
 {{- $registryName := .Values.global.imageRegistry -}}
 {{- $repositoryName := .Values.backend.image.repository -}}
 {{- $tag := .Values.backend.image.tag | toString -}}
+{{- if $registryName -}}
 {{- printf "%s/%s:%s" $registryName $repositoryName $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repositoryName $tag -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
@@ -199,7 +203,11 @@ Create frontend image name
 {{- $registryName := .Values.global.imageRegistry -}}
 {{- $repositoryName := .Values.frontend.image.repository -}}
 {{- $tag := .Values.frontend.image.tag | toString -}}
+{{- if $registryName -}}
 {{- printf "%s/%s:%s" $registryName $repositoryName $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repositoryName $tag -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
@@ -209,7 +217,48 @@ Create worker image name
 {{- $registryName := .Values.global.imageRegistry -}}
 {{- $repositoryName := .Values.worker.image.repository -}}
 {{- $tag := .Values.worker.image.tag | toString -}}
+{{- if $registryName -}}
 {{- printf "%s/%s:%s" $registryName $repositoryName $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repositoryName $tag -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create events service name
+*/}}
+{{- define "audit-service.events.name" -}}
+{{- include "audit-service.fullname" . }}-events
+{{- end -}}
+
+{{/*
+Create events service labels
+*/}}
+{{- define "audit-service.events.labels" -}}
+{{- include "audit-service.labels" . | nindent 0 }}
+app.kubernetes.io/component: events
+{{- end -}}
+
+{{/*
+Create events service selector labels
+*/}}
+{{- define "audit-service.events.selectorLabels" -}}
+{{- include "audit-service.selectorLabels" . | nindent 0 }}
+app.kubernetes.io/component: events
+{{- end -}}
+
+{{/*
+Create events service image name
+*/}}
+{{- define "audit-service.events.image" -}}
+{{- $registryName := .Values.global.imageRegistry -}}
+{{- $repositoryName := .Values.events.image.repository -}}
+{{- $tag := .Values.events.image.tag | toString -}}
+{{- if $registryName -}}
+{{- printf "%s/%s:%s" $registryName $repositoryName $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repositoryName $tag -}}
+{{- end -}}
 {{- end -}}
 
 {{/*

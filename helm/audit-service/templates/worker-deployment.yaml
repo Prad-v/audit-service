@@ -42,10 +42,37 @@ spec:
         {{- end }}
         env:
         {{- include "audit-service.backend.env" . | nindent 8 }}
-        - name: DATABASE_URL
+        
+        # Database credentials from PostgreSQL secret
+        {{- if .Values.database.postgresql.enabled }}
+        - name: POSTGRES_USERNAME
           valueFrom:
             secretKeyRef:
-              name: {{ include "audit-service.secretName" . }}
+              name: {{ .Values.database.credentials.secretName }}
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.credentials.secretName }}
+              key: password
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.credentials.secretName }}
+              key: database
+        {{- else }}
+        - name: EXTERNAL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.postgresql.external.passwordSecret.secretName }}
+              key: {{ .Values.database.postgresql.external.passwordSecret.passwordKey }}
+        {{- end }}
+        
+        # Application configuration
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "audit-service.fullname" . }}-config
               key: DATABASE_URL
         - name: JWT_SECRET_KEY
           valueFrom:
@@ -54,13 +81,13 @@ spec:
               key: JWT_SECRET_KEY
         - name: REDIS_URL
           valueFrom:
-            secretKeyRef:
-              name: {{ include "audit-service.secretName" . }}
+            configMapKeyRef:
+              name: {{ include "audit-service.fullname" . }}-config
               key: REDIS_URL
         - name: NATS_URL
           valueFrom:
-            secretKeyRef:
-              name: {{ include "audit-service.secretName" . }}
+            configMapKeyRef:
+              name: {{ include "audit-service.fullname" . }}-config
               key: NATS_URL
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: "/var/secrets/google/key.json"

@@ -76,86 +76,38 @@ data:
   CORS_CREDENTIALS: {{ .Values.backend.env.CORS_CREDENTIALS | quote }}
   CORS_METHODS: {{ .Values.backend.env.CORS_METHODS | quote }}
   CORS_HEADERS: {{ .Values.backend.env.CORS_HEADERS | quote }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "audit-service.fullname" . }}-nginx-config
-  namespace: {{ .Values.namespace.name }}
-  labels:
-    {{- include "audit-service.labels" . | nindent 4 }}
-data:
-  nginx.conf: |
-    upstream backend {
-        server {{ include "audit-service.backend.serviceName" . }}:{{ .Values.backend.ports.http }};
-    }
-    
-    server {
-        listen 80;
-        server_name _;
-        
-        # Security headers
-        add_header X-Frame-Options DENY;
-        add_header X-Content-Type-Options nosniff;
-        add_header X-XSS-Protection "1; mode=block";
-        add_header Referrer-Policy "strict-origin-when-cross-origin";
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';";
-        
-        # Rate limiting
-        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-        limit_req_zone $binary_remote_addr zone=frontend:10m rate=30r/s;
-        
-        # Frontend routes
-        location / {
-            limit_req zone=frontend burst=20 nodelay;
-            try_files $uri $uri/ /index.html;
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-        
-        # API routes
-        location /api/ {
-            limit_req zone=api burst=10 nodelay;
-            proxy_pass http://backend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_connect_timeout 30s;
-            proxy_send_timeout 30s;
-            proxy_read_timeout 30s;
-        }
-        
-        # Health check
-        location /health/ {
-            proxy_pass http://backend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # Metrics endpoint
-        location /metrics {
-            proxy_pass http://backend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # Documentation
-        location /docs {
-            alias /usr/share/nginx/docs;
-            try_files $uri $uri/ /docs/index.html;
-            expires 1h;
-            add_header Cache-Control "public";
-        }
-        
-        # Static assets
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-            try_files $uri =404;
-        }
-    }
+  
+  # Database URLs generated based on configuration
+  {{- if .Values.database.postgresql.enabled }}
+  # Internal PostgreSQL subchart - using secret values
+  # Note: Actual passwords will be injected via environment variables from secrets
+  DATABASE_URL: "postgresql+asyncpg://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@{{ include "audit-service.fullname" . }}-postgresql:5432/$(POSTGRES_DATABASE)"
+  {{- else }}
+  # External PostgreSQL
+  DATABASE_URL: "postgresql+asyncpg://{{ .Values.database.postgresql.external.username }}:$(EXTERNAL_POSTGRES_PASSWORD)@{{ .Values.database.postgresql.external.host }}:{{ .Values.database.postgresql.external.port }}/{{ .Values.database.postgresql.external.database }}"
+  {{- end }}
+  
+  {{- if .Values.database.nats.enabled }}
+  # Internal NATS subchart
+  NATS_URL: "nats://{{ include "audit-service.fullname" . }}-nats:4222"
+  {{- else }}
+  # External NATS
+  NATS_URL: "nats://{{ .Values.database.nats.external.host }}:{{ .Values.database.nats.external.port }}"
+  {{- end }}
+  
+  {{- if .Values.database.redis.enabled }}
+  # External Redis
+  REDIS_URL: "redis://{{ .Values.database.redis.host }}:{{ .Values.database.redis.port }}/{{ .Values.database.redis.database }}"
+  {{- else }}
+  # Default Redis URL (for backward compatibility)
+  REDIS_URL: "redis://redis-service:6379/0"
+  {{- end }}
+  
+  # Alerting Database URL
+  {{- if .Values.database.postgresql.enabled }}
+  ALERTING_DATABASE_URL: "postgresql+asyncpg://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@{{ include "audit-service.fullname" . }}-postgresql:5432/alerting_db"
+  {{- else }}
+  ALERTING_DATABASE_URL: "postgresql+asyncpg://{{ .Values.database.postgresql.external.username }}:$(EXTERNAL_POSTGRES_PASSWORD)@{{ .Values.database.postgresql.external.host }}:{{ .Values.database.postgresql.external.port }}/{{ .Values.database.postgresql.external.database }}"
+  {{- end }}
+  
+  # Events Database URL - handled directly in events deployment

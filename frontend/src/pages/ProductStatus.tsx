@@ -16,7 +16,9 @@ import {
   User,
   Filter,
   Search,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  X
 } from 'lucide-react'
 import { incidentsApi } from '../lib/api'
 
@@ -80,6 +82,47 @@ const ProductStatus: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showUpdateModal, setShowUpdateModal] = useState(false)
   const [showAddUpdateModal, setShowAddUpdateModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [updateForm, setUpdateForm] = useState({
+    status: '',
+    message: '',
+    public_message: '',
+    internal_notes: '',
+    update_type: 'status_update'
+  })
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    status: '',
+    severity: '',
+    incident_type: '',
+    affected_services: [] as string[],
+    affected_regions: [] as string[],
+    affected_components: [] as string[],
+    public_message: '',
+    internal_notes: '',
+    assigned_to: '',
+    tags: [] as string[],
+    is_public: true,
+    rss_enabled: true
+  })
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    description: '',
+    severity: '',
+    incident_type: '',
+    affected_services: [] as string[],
+    affected_regions: [] as string[],
+    affected_components: [] as string[],
+    start_time: new Date().toISOString(),
+    estimated_resolution: '',
+    public_message: '',
+    internal_notes: '',
+    assigned_to: '',
+    tags: [] as string[],
+    is_public: true,
+    rss_enabled: true
+  })
   const [filters, setFilters] = useState({
     status: '',
     severity: '',
@@ -161,16 +204,6 @@ const ProductStatus: React.FC = () => {
     loadData()
   }, [pagination.page, filters])
 
-  const handleCreateIncident = async (incidentData: any) => {
-    try {
-      await incidentsApi.createIncident(incidentData)
-      setShowCreateModal(false)
-      loadData()
-    } catch (error) {
-      console.error('Failed to create incident:', error)
-    }
-  }
-
   const handleUpdateIncident = async (incidentId: string, updateData: any) => {
     try {
       await incidentsApi.updateIncident(incidentId, updateData)
@@ -182,17 +215,6 @@ const ProductStatus: React.FC = () => {
     }
   }
 
-  const handleAddUpdate = async (incidentId: string, updateData: any) => {
-    try {
-      await incidentsApi.addIncidentUpdate(incidentId, updateData)
-      setShowAddUpdateModal(false)
-      setSelectedIncident(null)
-      loadData()
-    } catch (error) {
-      console.error('Failed to add update:', error)
-    }
-  }
-
   const handleDeleteIncident = async (incidentId: string) => {
     if (window.confirm('Are you sure you want to delete this incident?')) {
       try {
@@ -201,6 +223,99 @@ const ProductStatus: React.FC = () => {
       } catch (error) {
         console.error('Failed to delete incident:', error)
       }
+    }
+  }
+
+  const handleAddUpdate = async () => {
+    if (!selectedIncident) return
+    
+    try {
+      await incidentsApi.addIncidentUpdate(selectedIncident.id, updateForm)
+      setShowAddUpdateModal(false)
+      setUpdateForm({
+        status: '',
+        message: '',
+        public_message: '',
+        internal_notes: '',
+        update_type: 'status_update'
+      })
+      loadData()
+    } catch (error) {
+      console.error('Failed to add update:', error)
+    }
+  }
+
+  const handleEditIncident = async () => {
+    if (!selectedIncident) return
+    
+    try {
+      await incidentsApi.updateIncident(selectedIncident.id, editForm)
+      setShowUpdateModal(false)
+      setEditForm({
+        title: '',
+        description: '',
+        status: '',
+        severity: '',
+        incident_type: '',
+        affected_services: [],
+        affected_regions: [],
+        affected_components: [],
+        public_message: '',
+        internal_notes: '',
+        assigned_to: '',
+        tags: [],
+        is_public: true,
+        rss_enabled: true
+      })
+      loadData()
+    } catch (error) {
+      console.error('Failed to update incident:', error)
+    }
+  }
+
+  const populateEditForm = (incident: Incident) => {
+    setEditForm({
+      title: incident.title,
+      description: incident.description,
+      status: incident.status,
+      severity: incident.severity,
+      incident_type: incident.incident_type,
+      affected_services: incident.affected_services || [],
+      affected_regions: incident.affected_regions || [],
+      affected_components: incident.affected_components || [],
+      public_message: incident.public_message,
+      internal_notes: incident.internal_notes || '',
+      assigned_to: incident.assigned_to || '',
+      tags: incident.tags || [],
+      is_public: incident.is_public,
+      rss_enabled: incident.rss_enabled
+    })
+  }
+
+  const handleCreateIncident = async () => {
+    try {
+      await incidentsApi.createIncident(createForm)
+      setShowCreateModal(false)
+      setCreateForm({
+        title: '',
+        description: '',
+        severity: '',
+        incident_type: '',
+        affected_services: [],
+        affected_regions: [],
+        affected_components: [],
+        start_time: new Date().toISOString(),
+        estimated_resolution: '',
+        public_message: '',
+        internal_notes: '',
+        assigned_to: '',
+        tags: [],
+        is_public: true,
+        rss_enabled: true
+      })
+      loadData()
+    } catch (error) {
+      console.error('Failed to create incident:', error)
     }
   }
 
@@ -572,6 +687,16 @@ const ProductStatus: React.FC = () => {
                       <button
                         onClick={() => {
                           setSelectedIncident(incident)
+                          setShowViewModal(true)
+                        }}
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedIncident(incident)
                           setShowAddUpdateModal(true)
                         }}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -582,6 +707,7 @@ const ProductStatus: React.FC = () => {
                       <button
                         onClick={() => {
                           setSelectedIncident(incident)
+                          populateEditForm(incident)
                           setShowUpdateModal(true)
                         }}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -694,13 +820,208 @@ const ProductStatus: React.FC = () => {
       {/* 3. Adding status updates to incidents */}
       
       {/* Example modal structure: */}
+      {/* Create Incident Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3 text-center">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Incident</h3>
-              {/* Form would go here */}
-              <div className="flex justify-end space-x-3 mt-6">
+          <div className="relative top-4 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-md">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900">Create New Incident</h3>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="px-6 py-6 max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                    <input
+                      type="text"
+                      value={createForm.title}
+                      onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={createForm.description}
+                      onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Severity *</label>
+                    <select
+                      value={createForm.severity}
+                      onChange={(e) => setCreateForm({ ...createForm, severity: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      required
+                    >
+                      <option value="">Select Severity</option>
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                      <option value="minor">Minor</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Incident Type *</label>
+                    <select
+                      value={createForm.incident_type}
+                      onChange={(e) => setCreateForm({ ...createForm, incident_type: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      required
+                    >
+                      <option value="">Select Type</option>
+                      <option value="outage">Outage</option>
+                      <option value="degraded_performance">Degraded Performance</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="security">Security</option>
+                      <option value="feature_disabled">Feature Disabled</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input
+                      type="datetime-local"
+                      value={createForm.start_time.slice(0, 16)}
+                      onChange={(e) => setCreateForm({ ...createForm, start_time: new Date(e.target.value).toISOString() })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Resolution</label>
+                    <input
+                      type="datetime-local"
+                      value={createForm.estimated_resolution ? new Date(createForm.estimated_resolution).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => setCreateForm({ ...createForm, estimated_resolution: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Affected Services</label>
+                    <input
+                      type="text"
+                      value={createForm.affected_services.join(', ')}
+                      onChange={(e) => setCreateForm({ ...createForm, affected_services: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="service1, service2, service3"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Affected Regions</label>
+                    <input
+                      type="text"
+                      value={createForm.affected_regions.join(', ')}
+                      onChange={(e) => setCreateForm({ ...createForm, affected_regions: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="us-east-1, eu-west-1"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Affected Components</label>
+                    <input
+                      type="text"
+                      value={createForm.affected_components.join(', ')}
+                      onChange={(e) => setCreateForm({ ...createForm, affected_components: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="api, database, cache"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                    <input
+                      type="text"
+                      value={createForm.assigned_to}
+                      onChange={(e) => setCreateForm({ ...createForm, assigned_to: e.target.value })}
+                      placeholder="username or email"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                    <input
+                      type="text"
+                      value={createForm.tags.join(', ')}
+                      onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="tag1, tag2, tag3"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Public Message *</label>
+                  <textarea
+                    value={createForm.public_message}
+                    onChange={(e) => setCreateForm({ ...createForm, public_message: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Internal Notes</label>
+                  <textarea
+                    value={createForm.internal_notes}
+                    onChange={(e) => setCreateForm({ ...createForm, internal_notes: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-6">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={createForm.is_public}
+                      onChange={(e) => setCreateForm({ ...createForm, is_public: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Public Incident</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={createForm.rss_enabled}
+                      onChange={(e) => setCreateForm({ ...createForm, rss_enabled: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">RSS Enabled</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-md">
+              <div className="flex items-center justify-end space-x-3">
                 <button
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
@@ -708,10 +1029,569 @@ const ProductStatus: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {/* Handle create */}}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  onClick={handleCreateIncident}
+                  disabled={!createForm.title || !createForm.severity || !createForm.incident_type || !createForm.public_message}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create
+                  Create Incident
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Incident Modal/Slider */}
+      {showViewModal && selectedIncident && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-4 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-md">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900">Incident Details</h3>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="px-6 py-6 max-h-96 overflow-y-auto">
+              {/* Incident Header */}
+              <div className="mb-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedIncident.title}</h1>
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedIncident.status)}`}>
+                        {selectedIncident.status.replace('_', ' ')}
+                      </span>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getSeverityColor(selectedIncident.severity)}`}>
+                        {selectedIncident.severity}
+                      </span>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                        {selectedIncident.incident_type.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-gray-700 text-lg mb-4">{selectedIncident.public_message}</p>
+                
+                {selectedIncident.description && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
+                    <p className="text-gray-600">{selectedIncident.description}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Incident Details Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Timeline</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <span className="font-medium">Started:</span>
+                        <span className="ml-2">{formatDateTime(selectedIncident.start_time)}</span>
+                      </div>
+                      {selectedIncident.end_time && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          <span className="font-medium">Resolved:</span>
+                          <span className="ml-2">{formatDateTime(selectedIncident.end_time)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <span className="font-medium">Duration:</span>
+                        <span className="ml-2">{calculateDuration(selectedIncident.start_time, selectedIncident.end_time)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Affected Resources</h4>
+                    <div className="space-y-2">
+                      {selectedIncident.affected_services && selectedIncident.affected_services.length > 0 && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Settings className="w-4 h-4 mr-2" />
+                          <span className="font-medium">Services:</span>
+                          <span className="ml-2">{selectedIncident.affected_services.join(', ')}</span>
+                        </div>
+                      )}
+                      {selectedIncident.affected_regions && selectedIncident.affected_regions.length > 0 && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <MapPin className="w-4 h-4 mr-2" />
+                          <span className="font-medium">Regions:</span>
+                          <span className="ml-2">{selectedIncident.affected_regions.join(', ')}</span>
+                        </div>
+                      )}
+                      {selectedIncident.affected_components && selectedIncident.affected_components.length > 0 && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Settings className="w-4 h-4 mr-2" />
+                          <span className="font-medium">Components:</span>
+                          <span className="ml-2">{selectedIncident.affected_components.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Metadata</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <User className="w-4 h-4 mr-2" />
+                        <span className="font-medium">Created by:</span>
+                        <span className="ml-2">{selectedIncident.created_by}</span>
+                      </div>
+                      {selectedIncident.assigned_to && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <User className="w-4 h-4 mr-2" />
+                          <span className="font-medium">Assigned to:</span>
+                          <span className="ml-2">{selectedIncident.assigned_to}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <span className="font-medium">Created:</span>
+                        <span className="ml-2">{formatDateTime(selectedIncident.created_at)}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <span className="font-medium">Updated:</span>
+                        <span className="ml-2">{formatDateTime(selectedIncident.updated_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedIncident.tags && selectedIncident.tags.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Tags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedIncident.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Internal Notes */}
+              {selectedIncident.internal_notes && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Internal Notes</h4>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                    <p className="text-sm text-gray-700">{selectedIncident.internal_notes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Updates Timeline */}
+              {selectedIncident.updates && selectedIncident.updates.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-4">Updates Timeline</h4>
+                  <div className="space-y-4">
+                    {selectedIncident.updates.map((update, index) => (
+                      <div key={update.id} className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          <div className={`w-3 h-3 rounded-full ${
+                            index === 0 ? 'bg-blue-500' : 'bg-gray-300'
+                          }`}></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              update.status === 'investigating' ? 'text-yellow-600 bg-yellow-100' :
+                              update.status === 'identified' ? 'text-blue-600 bg-blue-100' :
+                              update.status === 'monitoring' ? 'text-orange-600 bg-orange-100' :
+                              update.status === 'resolved' ? 'text-green-600 bg-green-100' :
+                              'text-gray-600 bg-gray-100'
+                            }`}>
+                              {update.status.replace('_', ' ')}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {formatDateTime(update.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-1">{update.message}</p>
+                          {update.public_message && update.public_message !== update.message && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+                              <p className="text-xs text-blue-700 font-medium mb-1">Public Message:</p>
+                              <p className="text-xs text-blue-600">{update.public_message}</p>
+                            </div>
+                          )}
+                          {update.internal_notes && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-2 mt-2">
+                              <p className="text-xs text-yellow-700 font-medium mb-1">Internal Notes:</p>
+                              <p className="text-xs text-yellow-600">{update.internal_notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowViewModal(false)
+                      setShowAddUpdateModal(true)
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Add Update
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowViewModal(false)
+                      setShowUpdateModal(true)
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Incident
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Update Modal */}
+      {showAddUpdateModal && selectedIncident && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Update to Incident</h3>
+              <p className="text-sm text-gray-600 mb-4">Adding update to: <strong>{selectedIncident.title}</strong></p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={updateForm.status}
+                    onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  >
+                    <option value="">Select Status</option>
+                    <option value="investigating">Investigating</option>
+                    <option value="identified">Identified</option>
+                    <option value="monitoring">Monitoring</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="post_incident">Post Incident</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Update Type</label>
+                  <select
+                    value={updateForm.update_type}
+                    onChange={(e) => setUpdateForm({ ...updateForm, update_type: e.target.value })}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  >
+                    <option value="status_update">Status Update</option>
+                    <option value="investigation_update">Investigation Update</option>
+                    <option value="resolution_update">Resolution Update</option>
+                    <option value="incident_created">Incident Created</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                  <textarea
+                    value={updateForm.message}
+                    onChange={(e) => setUpdateForm({ ...updateForm, message: e.target.value })}
+                    placeholder="Internal message for the update"
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Public Message</label>
+                  <textarea
+                    value={updateForm.public_message}
+                    onChange={(e) => setUpdateForm({ ...updateForm, public_message: e.target.value })}
+                    placeholder="Public message for customers"
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Internal Notes</label>
+                  <textarea
+                    value={updateForm.internal_notes}
+                    onChange={(e) => setUpdateForm({ ...updateForm, internal_notes: e.target.value })}
+                    placeholder="Internal notes (optional)"
+                    rows={2}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowAddUpdateModal(false)
+                    setUpdateForm({
+                      status: '',
+                      message: '',
+                      public_message: '',
+                      internal_notes: '',
+                      update_type: 'status_update'
+                    })
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddUpdate}
+                  disabled={!updateForm.message || !updateForm.public_message}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Update
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Incident Modal */}
+      {showUpdateModal && selectedIncident && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-4 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-md">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900">Edit Incident</h3>
+                <button
+                  onClick={() => setShowUpdateModal(false)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="px-6 py-6 max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    >
+                      <option value="investigating">Investigating</option>
+                      <option value="identified">Identified</option>
+                      <option value="monitoring">Monitoring</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="post_incident">Post Incident</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                    <select
+                      value={editForm.severity}
+                      onChange={(e) => setEditForm({ ...editForm, severity: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    >
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                      <option value="minor">Minor</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Incident Type</label>
+                    <select
+                      value={editForm.incident_type}
+                      onChange={(e) => setEditForm({ ...editForm, incident_type: e.target.value })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    >
+                      <option value="outage">Outage</option>
+                      <option value="degraded_performance">Degraded Performance</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="security">Security</option>
+                      <option value="feature_disabled">Feature Disabled</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Affected Services</label>
+                    <input
+                      type="text"
+                      value={editForm.affected_services.join(', ')}
+                      onChange={(e) => setEditForm({ ...editForm, affected_services: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="service1, service2, service3"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Affected Regions</label>
+                    <input
+                      type="text"
+                      value={editForm.affected_regions.join(', ')}
+                      onChange={(e) => setEditForm({ ...editForm, affected_regions: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="us-east-1, eu-west-1"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Affected Components</label>
+                    <input
+                      type="text"
+                      value={editForm.affected_components.join(', ')}
+                      onChange={(e) => setEditForm({ ...editForm, affected_components: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="api, database, cache"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                    <input
+                      type="text"
+                      value={editForm.assigned_to}
+                      onChange={(e) => setEditForm({ ...editForm, assigned_to: e.target.value })}
+                      placeholder="username or email"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                    <input
+                      type="text"
+                      value={editForm.tags.join(', ')}
+                      onChange={(e) => setEditForm({ ...editForm, tags: e.target.value.split(',').map(s => s.trim()).filter(s => s) })}
+                      placeholder="tag1, tag2, tag3"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Public Message</label>
+                  <textarea
+                    value={editForm.public_message}
+                    onChange={(e) => setEditForm({ ...editForm, public_message: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Internal Notes</label>
+                  <textarea
+                    value={editForm.internal_notes}
+                    onChange={(e) => setEditForm({ ...editForm, internal_notes: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-6">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_public}
+                      onChange={(e) => setEditForm({ ...editForm, is_public: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Public Incident</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editForm.rss_enabled}
+                      onChange={(e) => setEditForm({ ...editForm, rss_enabled: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">RSS Enabled</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-md">
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => setShowUpdateModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditIncident}
+                  disabled={!editForm.title || !editForm.public_message}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Update Incident
                 </button>
               </div>
             </div>

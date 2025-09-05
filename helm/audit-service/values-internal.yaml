@@ -1,0 +1,122 @@
+# Example values for using internal database subcharts
+# This file shows how to configure the chart to use built-in PostgreSQL and NATS services
+
+# Database Configuration - Use Internal Subcharts
+database:
+  # PostgreSQL Configuration - Use Internal Subchart
+  postgresql:
+    enabled: true  # Enable internal PostgreSQL subchart
+    internal:
+      postgresql:
+        auth:
+        credentials:
+          secretName: "postgresql-credentials"
+          usernameKey: "username"
+          passwordKey: "password"
+          databaseKey: "database"
+        primary:
+          persistence:
+            enabled: true
+            size: 5Gi  # Smaller size for testing
+            storageClass: ""
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+        metrics:
+          enabled: false  # Disable metrics for testing
+  
+  # NATS Configuration - Use Internal Subchart
+  nats:
+    enabled: true  # Enable internal NATS subchart
+    internal:
+      nats:
+        enabled: true
+        jetstream:
+          enabled: true
+          memStorage:
+            enabled: true
+            size: 512Mi  # Smaller size for testing
+          fileStorage:
+            enabled: true
+            size: 5Gi  # Smaller size for testing
+            storageClass: ""
+        cluster:
+          enabled: false
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        metrics:
+          enabled: false  # Disable metrics for testing
+  
+  # Redis Configuration - Use External Service (Docker Compose)
+  redis:
+    enabled: true
+    host: "host.docker.internal"  # Connect to Docker Compose Redis
+    port: 6379
+    database: 0
+    password: ""
+    ssl: false
+    maxConnections: 20
+    retryOnTimeout: true
+    socketKeepalive: true
+    socketKeepaliveOptions: "1,3,5"
+
+# Use local images for testing
+global:
+  environment: development
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Use local Docker images
+image:
+  repository: audit-service
+  tag: latest
+  pullPolicy: Never
+  frontend:
+    repository: audit-service-frontend
+    tag: latest
+    pullPolicy: Never
+
+# Reduce replicas for testing
+backend:
+  replicas: 1
+  image:
+    repository: audit-service-backend
+    tag: latest
+    pullPolicy: Never
+
+frontend:
+  replicas: 1
+  image:
+    repository: audit-service-frontend
+    tag: latest
+    pullPolicy: Never
+
+worker:
+  replicas: 1
+  image:
+    repository: audit-service-backend
+    tag: latest
+    pullPolicy: Never
+
+alerting:
+  replicas: 1
+  image:
+    repository: audit-service-alerting
+    tag: latest
+    pullPolicy: Never
+# Minimal secrets for testing
+secrets:
+  jwtSecretKey: "dev-jwt-secret-key-for-testing-only"
+  googleCredentials: "{}"
+  apiKeySecret: "dev-api-key-secret-for-testing-only"
+  encryptionKey: "dev-encryption-key-for-testing-only"
+

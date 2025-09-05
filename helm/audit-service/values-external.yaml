@@ -1,0 +1,69 @@
+# Example values for using external database services
+# This file shows how to configure the chart to use existing PostgreSQL and NATS services
+
+# Database Configuration - Use External Services
+database:
+  # PostgreSQL Configuration - Use External Service
+  postgresql:
+    enabled: false  # Disable internal PostgreSQL subchart
+    external:
+      host: "your-postgres-host"
+      port: 5432
+      database: "audit_logs"
+      username: "audit_user"
+      password: "your-secure-password"
+      sslMode: "prefer"
+      poolSize: 20
+      maxOverflow: 30
+      poolTimeout: 30
+      poolRecycle: 3600
+  
+  # NATS Configuration - Use External Service
+  nats:
+    enabled: false  # Disable internal NATS subchart
+    external:
+      host: "your-nats-host"
+      port: 4222
+      httpPort: 8222
+      clusterPort: 6222
+      jetstream:
+        enabled: true
+  
+  # Redis Configuration - Use External Service
+  redis:
+    enabled: true
+    host: "your-redis-host"
+    port: 6379
+    database: 0
+    password: "your-redis-password"
+    ssl: false
+    maxConnections: 20
+    retryOnTimeout: true
+    socketKeepalive: true
+    socketKeepaliveOptions: "1,3,5"
+
+# Override other values as needed
+global:
+  environment: production
+  imageRegistry: "your-registry.com"
+  imagePullSecrets:
+    - name: your-registry-secret
+
+# Update image repositories to use your registry
+image:
+  repository: your-registry.com/audit-service
+  frontend:
+    repository: your-registry.com/audit-service-frontend
+
+# Update secrets with your actual values
+secrets:
+  jwtSecretKey: "your-actual-jwt-secret-key"
+  googleCredentials: "{}"
+  apiKeySecret: "your-actual-api-key-secret"
+  encryptionKey: "your-actual-encryption-key"
+
+# Example: If you want to use a different namespace
+namespace:
+  create: false
+  name: your-existing-namespace
+

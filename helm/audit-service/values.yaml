@@ -4,19 +4,158 @@
 # Global configuration
 global:
   environment: production
-  imageRegistry: gcr.io
-  imagePullSecrets:
-    - name: audit-service-registry
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Database Configuration
+# Users can choose between internal subcharts or external services
+database:
+  # PostgreSQL Configuration
+  postgresql:
+    # Enable/disable PostgreSQL subchart
+    enabled: true
+    
+    # Internal PostgreSQL subchart configuration (when enabled: true)
+    internal:
+      # PostgreSQL subchart values
+      postgresql:
+        enabled: true
+        auth:
+          # These will be overridden by secrets in production
+          postgresPassword: "postgres-password-123"
+          database: "audit_logs"
+          username: "audit_user"
+          password: "audit-password-123"
+        # Reference to Kubernetes secret for credentials
+        credentials:
+          secretName: "{{ .Values.database.postgresql.credentials.secretName }}"
+          usernameKey: "username"
+          passwordKey: "password"
+          databaseKey: "database"
+          postgresPasswordKey: "postgres-password"
+        primary:
+          persistence:
+            enabled: true
+            size: 10Gi
+            storageClass: ""
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+        readReplicas:
+          enabled: false
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+    
+    # External PostgreSQL configuration (when enabled: false)
+    external:
+      host: "postgres-service"
+      port: 5432
+      database: "audit_logs"
+      username: "audit_user"
+      # Password should be provided via secret
+      password: "{{ .Values.database.postgresql.external.passwordSecret.password }}"
+      sslMode: "prefer"
+      poolSize: 20
+      maxOverflow: 30
+      poolTimeout: 30
+      poolRecycle: 3600
+      # Secret reference for external PostgreSQL
+      passwordSecret:
+        secretName: "{{ .Values.database.postgresql.external.passwordSecret.secretName }}"
+        passwordKey: "{{ .Values.database.postgresql.external.passwordSecret.passwordKey }}"
+  
+  # PostgreSQL Credentials Configuration
+  credentials:
+    # Default secret name for PostgreSQL credentials
+    secretName: "postgresql-credentials"
+    # Default database names
+    databases:
+      - name: "audit_logs"
+        description: "Main audit logs database"
+      - name: "alerting_db"
+        description: "Alerting service database"
+      - name: "events_db"
+        description: "Events service database"
+    # Default user configuration
+    users:
+      - username: "audit_user"
+        description: "Main application user"
+        databases: ["audit_logs", "alerting_db", "events_db"]
+      - username: "readonly_user"
+        description: "Read-only user for monitoring"
+        databases: ["audit_logs"]
+        readonly: true
+
+  # NATS Configuration
+  nats:
+    # Enable/disable NATS subchart
+    enabled: true
+    
+    # Internal NATS subchart configuration (when enabled: true)
+    internal:
+      # NATS subchart values
+      nats:
+        enabled: true
+        jetstream:
+          enabled: true
+          memStorage:
+            enabled: true
+            size: 1Gi
+          fileStorage:
+            enabled: true
+            size: 10Gi
+            storageClass: ""
+        cluster:
+          enabled: false
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+    
+    # External NATS configuration (when enabled: false)
+    external:
+      host: "nats-service"
+      port: 4222
+      httpPort: 8222
+      clusterPort: 6222
+      jetstream:
+        enabled: true
+  
+  # Redis Configuration (external only - no subchart)
+  redis:
+    enabled: false
+    host: "redis-service"
+    port: 6379
+    database: 0
+    password: ""
+    ssl: false
+    maxConnections: 20
+    retryOnTimeout: true
+    socketKeepalive: true
+    socketKeepaliveOptions: "1,3,5"
 
 # Image configuration
 image:
-  repository: PROJECT_ID/audit-service
+  repository: audit-service
   tag: latest
-  pullPolicy: Always
+  pullPolicy: Never
   frontend:
-    repository: PROJECT_ID/audit-service-frontend
+    repository: audit-service-frontend
     tag: latest
-    pullPolicy: Always
+    pullPolicy: Never
 
 # Application configuration
 app:
@@ -27,14 +166,15 @@ app:
     frontend: 2
     worker: 2
     alerting: 2
+    events: 2
 
 # Namespace configuration
 namespace:
-  create: true
-  name: audit-service
+  create: false
+  name: default
   annotations: {}
   labels:
-    environment: production
+    environment: development
     app.kubernetes.io/name: audit-service
     app.kubernetes.io/component: namespace
 
@@ -67,9 +207,9 @@ resources:
 backend:
   enabled: true
   image:
-    repository: gcr.io/PROJECT_ID/audit-service-backend
+    repository: audit-service-backend
     tag: latest
-    pullPolicy: Always
+    pullPolicy: Never
   
   replicas: 3
   strategy:
@@ -88,7 +228,7 @@ backend:
   
   ports:
     http: 8000
-    metrics: 8000
+    metrics: 8001
   
   env:
     # Application Configuration
@@ -98,7 +238,7 @@ backend:
     PROJECT_NAME: "Audit Service"
     
     # Database Configuration
-    DATABASE_TYPE: "bigquery"
+    DATABASE_TYPE: "postgresql"
     DATABASE_POOL_SIZE: "20"
     DATABASE_MAX_OVERFLOW: "30"
     DATABASE_POOL_TIMEOUT: "30"
@@ -166,9 +306,9 @@ backend:
 frontend:
   enabled: true
   image:
-    repository: gcr.io/PROJECT_ID/audit-service-frontend
+    repository: audit-service-frontend
     tag: latest
-    pullPolicy: Always
+    pullPolicy: Never
   
   replicas: 2
   strategy:
@@ -196,17 +336,17 @@ frontend:
 worker:
   enabled: true
   image:
-    repository: gcr.io/PROJECT_ID/audit-service-backend
+    repository: audit-service-backend
     tag: latest
-    pullPolicy: Always
+    pullPolicy: Never
 
 # Alerting service configuration
 alerting:
   enabled: true
   image:
-    repository: gcr.io/PROJECT_ID/audit-service-alerting
+    repository: audit-service-alerting
     tag: latest
-    pullPolicy: Always
+    pullPolicy: Never
   
   replicas: 2
   strategy:
@@ -225,7 +365,7 @@ alerting:
   
   ports:
     http: 8001
-    metrics: 8001
+    metrics: 8002
   
   env:
     # Application Configuration
@@ -263,6 +403,16 @@ alerting:
     CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
     CORS_HEADERS: "Content-Type,Authorization,X-Tenant-ID,X-Correlation-ID"
   
+  command: ["python", "-m", "app.worker"]
+
+# Events service configuration
+events:
+  enabled: true
+  image:
+    repository: audit-service-events
+    tag: latest
+    pullPolicy: Never
+  
   replicas: 2
   strategy:
     type: RollingUpdate
@@ -278,7 +428,49 @@ alerting:
       cpu: 1000m
       memory: 1Gi
   
-  command: ["python", "-m", "app.worker"]
+  ports:
+    http: 8003
+    metrics: 8004
+  
+  env:
+    # Application Configuration
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"
+    API_V1_STR: "/api/v1"
+    PROJECT_NAME: "Events Service"
+    
+    # Database Configuration
+    EVENTS_DATABASE_URL: "postgresql+asyncpg://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@{{ include \"audit-service.fullname\" . }}-postgresql:5432/events_db"
+    
+    # Authentication Configuration
+    EVENTS_API_KEY: "events-api-key-123"
+    
+    # Events Configuration
+    EVENTS_MAX_EVENTS_PER_HOUR: "1000"
+    EVENTS_RETENTION_DAYS: "30"
+    EVENTS_BATCH_SIZE: "100"
+    EVENTS_PROCESSING_TIMEOUT: "30"
+    
+    # Cloud Provider Configuration
+    CLOUD_PROVIDER_TIMEOUT: "30"
+    CLOUD_PROVIDER_RETRY_COUNT: "3"
+    CLOUD_PROVIDER_RETRY_DELAY: "5"
+    
+    # Webhook Configuration
+    WEBHOOK_TIMEOUT: "30"
+    WEBHOOK_RETRY_COUNT: "3"
+    WEBHOOK_RETRY_DELAY: "5"
+    
+    # Monitoring Configuration
+    METRICS_ENABLED: "true"
+    METRICS_PORT: "8003"
+    HEALTH_CHECK_INTERVAL: "30"
+    
+    # CORS Configuration
+    CORS_ORIGINS: "https://backstage.example.com,https://audit.example.com"
+    CORS_CREDENTIALS: "true"
+    CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+    CORS_HEADERS: "Content-Type,Authorization,X-Tenant-ID,X-Correlation-ID"
 
 # Service configuration
 service:
@@ -301,6 +493,13 @@ service:
     type: ClusterIP
     port: 8001
     targetPort: 8001
+    annotations: {}
+  
+  events:
+    enabled: true
+    type: ClusterIP
+    port: 8003
+    targetPort: 8003
     annotations: {}
 
 # Ingress configuration
@@ -333,6 +532,11 @@ ingress:
           service:
             name: audit-service-alerting
             port: 8001
+        - path: /events
+          pathType: Prefix
+          service:
+            name: audit-service-events
+            port: 8003
   
   tls:
     - secretName: audit-service-tls
@@ -356,6 +560,13 @@ hpa:
     targetMemoryUtilizationPercentage: 80
   
   alerting:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  events:
     enabled: true
     minReplicas: 2
     maxReplicas: 6
@@ -460,10 +671,15 @@ labels:
 # Secrets configuration
 # These should be provided via external secret management or CI/CD
 secrets:
-  databaseUrl: "postgresql://user:password@host:5432/database"
-  jwtSecretKey: "your-jwt-secret-key-here"
-  redisUrl: "redis://redis-host:6379/0"
-  natsUrl: "nats://nats-host:4222"
-  googleCredentials: "{}"
-  apiKeySecret: "your-api-key-secret-here"
-  encryptionKey: "your-encryption-key-here"
+  # JWT and API secrets
+  jwtSecretKey: "{{ .Values.secrets.jwtSecretKey | default (printf \"jwt-secret-%s\" (randAlphaNum 32)) }}"
+  googleCredentials: "{{ .Values.secrets.googleCredentials | default '{}' }}"
+  apiKeySecret: "{{ .Values.secrets.apiKeySecret | default (printf \"api-key-%s\" (randAlphaNum 32)) }}"
+  encryptionKey: "{{ .Values.secrets.encryptionKey | default (printf \"encryption-key-%s\" (randAlphaNum 32)) }}"
+  
+  # PostgreSQL credentials (should be provided via external secrets)
+  postgresql:
+    secretName: "{{ .Values.database.credentials.secretName }}"
+    postgresPassword: "{{ .Values.secrets.postgresql.postgresPassword | default (printf \"postgres-password-%s\" (randAlphaNum 16)) }}"
+    auditUserPassword: "{{ .Values.secrets.postgresql.auditUserPassword | default (printf \"audit-password-%s\" (randAlphaNum 16)) }}"
+    readonlyUserPassword: "{{ .Values.secrets.postgresql.readonlyUserPassword | default (printf \"readonly-password-%s\" (randAlphaNum 16)) }}"

@@ -1,0 +1,66 @@
+# External PostgreSQL configuration values
+# Use this when you want to use an external PostgreSQL instance instead of the internal subchart
+
+global:
+  environment: production
+
+# Disable internal PostgreSQL subchart
+database:
+  postgresql:
+    enabled: false
+    
+    # External PostgreSQL configuration
+    external:
+      host: "your-external-postgresql-host"
+      port: 5432
+      database: "audit_logs"
+      username: "audit_user"
+      sslMode: "require"
+      poolSize: 20
+      maxOverflow: 30
+      poolTimeout: 30
+      poolRecycle: 3600
+      # Secret reference for external PostgreSQL password
+      passwordSecret:
+        secretName: "external-postgresql-credentials"
+        passwordKey: "password"
+
+# Configure secrets for external PostgreSQL
+secrets:
+  # External PostgreSQL credentials (create this secret manually)
+  postgresql:
+    secretName: "external-postgresql-credentials"
+    # These values should be provided via external secret management
+    postgresPassword: "external-postgres-password"
+    auditUserPassword: "external-audit-password"
+    readonlyUserPassword: "external-readonly-password"
+
+# Application configuration
+app:
+  replicas:
+    backend: 2
+    frontend: 1
+    worker: 1
+    alerting: 1
+
+# Resource limits for external database setup
+resources:
+  quota:
+    enabled: false
+  limits:
+    enabled: true
+    default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+    port: metrics

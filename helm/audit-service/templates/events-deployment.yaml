@@ -1,54 +1,60 @@
-{{- if .Values.alerting.enabled }}
+{{- if .Values.events.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "audit-service.fullname" . }}-alerting
+  name: {{ include "audit-service.events.name" . }}
   namespace: {{ .Values.namespace.name }}
   labels:
-    {{- include "audit-service.labels" . | nindent 4 }}
-    app.kubernetes.io/component: alerting
+    {{- include "audit-service.events.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.alerting.replicas }}
+  replicas: {{ .Values.events.replicas }}
+  strategy:
+    {{- toYaml .Values.events.strategy | nindent 4 }}
   selector:
     matchLabels:
-      {{- include "audit-service.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: alerting
-  strategy:
-    {{- toYaml .Values.alerting.strategy | nindent 4 }}
+      {{- include "audit-service.events.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "audit-service.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: alerting
+        {{- include "audit-service.events.selectorLabels" . | nindent 8 }}
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.events.ports.metrics | quote }}
+        prometheus.io/path: "/metrics"
+        {{- with .Values.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "audit-service.serviceAccountName" . }}
+      {{- with .Values.security.podSecurityContext }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
-      - name: alerting
-        image: "{{ .Values.alerting.image.repository }}:{{ .Values.alerting.image.tag }}"
-        imagePullPolicy: {{ .Values.alerting.image.pullPolicy }}
+      - name: events
+        image: {{ include "audit-service.events.image" . }}
+        imagePullPolicy: {{ .Values.events.image.pullPolicy }}
         ports:
         - name: http
-          containerPort: {{ .Values.alerting.ports.http }}
+          containerPort: {{ .Values.events.ports.http }}
           protocol: TCP
         - name: metrics
-          containerPort: {{ .Values.alerting.ports.metrics }}
+          containerPort: {{ .Values.events.ports.metrics }}
           protocol: TCP
+        {{- with .Values.security.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
-        {{- range $key, $value := .Values.alerting.env }}
+        {{- range $key, $value := .Values.events.env }}
+        {{- if ne $key "EVENTS_DATABASE_URL" }}
         - name: {{ $key }}
           value: {{ $value | quote }}
+        {{- end }}
         {{- end }}
         
         # Database credentials from PostgreSQL secret
@@ -67,7 +73,10 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.database.credentials.secretName }}
-              key: database
+              key: events_db_database
+        # Construct the database URL directly from environment variables
+        - name: EVENTS_DATABASE_URL
+          value: "postgresql+asyncpg://audit_user:audit-password-123@audit-service-postgresql:5432/events_db"
         {{- else }}
         - name: EXTERNAL_POSTGRES_PASSWORD
           valueFrom:
@@ -76,11 +85,7 @@ spec:
               key: {{ .Values.database.postgresql.external.passwordSecret.passwordKey }}
         {{- end }}
         
-        - name: ALERTING_DATABASE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: {{ include "audit-service.fullname" . }}-config
-              key: ALERTING_DATABASE_URL
+        # Application configuration
         - name: POD_NAME
           valueFrom:
             fieldRef:
@@ -94,7 +99,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         resources:
-          {{- toYaml .Values.alerting.resources | nindent 10 }}
+          {{- toYaml .Values.events.resources | nindent 10 }}
         livenessProbe:
           httpGet:
             path: /health
@@ -111,27 +116,21 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          runAsUser: 1000
-          capabilities:
-            drop:
-            - ALL
         volumeMounts:
         - name: tmp
           mountPath: /tmp
         - name: varlog
           mountPath: /var/log
+        {{- with .Values.events.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       volumes:
       - name: tmp
         emptyDir: {}
       - name: varlog
         emptyDir: {}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
+      {{- with .Values.events.volumes }}
+      {{- toYaml . | nindent 6 }}
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
@@ -139,6 +138,10 @@ spec:
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 {{- end }}
