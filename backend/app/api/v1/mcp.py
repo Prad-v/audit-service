@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.services.mcp_service import mcp_service
+from app.services.mcp_service import mcp_service, QueryType
 from app.api.middleware import get_current_user
 
 router = APIRouter(prefix="/mcp", tags=["MCP - Natural Language Queries"])
@@ -46,14 +46,17 @@ async def mcp_health_check():
     """Health check endpoint for MCP service"""
     return MCPHealthResponse(
         status="healthy",
-        service="audit-events-mcp",
+        service="audit-events-incidents-mcp",
         version="1.0.0",
         capabilities=[
             "natural_language_search",
             "audit_analytics",
             "trend_analysis",
             "alert_generation",
-            "summary_reports"
+            "summary_reports",
+            "cloud_events_query",
+            "incidents_query",
+            "outages_query"
         ]
     )
 
@@ -246,7 +249,7 @@ async def get_mcp_capabilities():
     try:
         # Return capabilities directly
         result = {
-            "service": "audit-events-mcp",
+            "service": "audit-events-incidents-mcp",
             "version": "1.0.0",
             "capabilities": {
                 "natural_language_search": {
@@ -288,6 +291,30 @@ async def get_mcp_capabilities():
                         "Show me an overview of the last week",
                         "Summarize recent activity"
                     ]
+                },
+                "cloud_events_query": {
+                    "description": "Query cloud provider events using natural language",
+                    "examples": [
+                        "Show me all AWS events from today",
+                        "What Azure service disruptions happened this week?",
+                        "Get high severity GCP events from us-east-1"
+                    ]
+                },
+                "incidents_query": {
+                    "description": "Query incidents using natural language",
+                    "examples": [
+                        "Show me all active incidents",
+                        "What incidents were created this week?",
+                        "Get high severity incidents affecting the API service"
+                    ]
+                },
+                "outages_query": {
+                    "description": "Query cloud provider outages using natural language",
+                    "examples": [
+                        "Show me all active cloud provider outages",
+                        "What AWS outages happened today?",
+                        "Get Azure service disruptions in us-east-1"
+                    ]
                 }
             },
             "supported_time_ranges": [
@@ -301,7 +328,15 @@ async def get_mcp_capabilities():
                 "critical", "high", "medium", "low", "info"
             ],
             "supported_services": [
-                "api", "frontend", "backend", "database", "auth", "user"
+                "api", "frontend", "backend", "database", "auth", "user",
+                "s3", "ec2", "lambda", "rds", "dynamodb", "cloudfront", "route53"
+            ],
+            "supported_cloud_providers": [
+                "aws", "azure", "gcp", "amazon", "microsoft", "google"
+            ],
+            "supported_regions": [
+                "us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1",
+                "north america", "europe", "asia"
             ]
         }
         
@@ -313,5 +348,109 @@ async def get_mcp_capabilities():
             detail=f"Failed to get capabilities: {str(e)}"
         )
 
+
+@router.post("/query/events", response_model=MCPQueryResponse)
+async def query_cloud_events(
+    request: NaturalLanguageQuery,
+    current_user: Optional[str] = Depends(get_current_user)
+):
+    """
+    Query cloud provider events using natural language
+    
+    Examples:
+    - "Show me all AWS events from today"
+    - "What Azure service disruptions happened this week?"
+    - "Get high severity GCP events from us-east-1"
+    """
+    try:
+        # Process the query through MCP service with events focus
+        intent = mcp_service._parse_query_intent(request.query)
+        intent.query_type = QueryType.EVENTS
+        result = await mcp_service._execute_query(intent)
+        
+        return MCPQueryResponse(
+            success=True,
+            data=result,
+            error=None,
+            query_processed=request.query,
+            query_type="cloud_events",
+            result_count=result.get("count", 0)
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process cloud events query: {str(e)}"
+        )
+
+
+@router.post("/query/incidents", response_model=MCPQueryResponse)
+async def query_incidents(
+    request: NaturalLanguageQuery,
+    current_user: Optional[str] = Depends(get_current_user)
+):
+    """
+    Query incidents using natural language
+    
+    Examples:
+    - "Show me all active incidents"
+    - "What incidents were created this week?"
+    - "Get high severity incidents affecting the API service"
+    """
+    try:
+        # Process the query through MCP service with incidents focus
+        intent = mcp_service._parse_query_intent(request.query)
+        intent.query_type = QueryType.INCIDENTS
+        result = await mcp_service._execute_query(intent)
+        
+        return MCPQueryResponse(
+            success=True,
+            data=result,
+            error=None,
+            query_processed=request.query,
+            query_type="incidents",
+            result_count=result.get("count", 0)
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process incidents query: {str(e)}"
+        )
+
+
+@router.post("/query/outages", response_model=MCPQueryResponse)
+async def query_outages(
+    request: NaturalLanguageQuery,
+    current_user: Optional[str] = Depends(get_current_user)
+):
+    """
+    Query cloud provider outages using natural language
+    
+    Examples:
+    - "Show me all active cloud provider outages"
+    - "What AWS outages happened today?"
+    - "Get Azure service disruptions in us-east-1"
+    """
+    try:
+        # Process the query through MCP service with outages focus
+        intent = mcp_service._parse_query_intent(request.query)
+        intent.query_type = QueryType.OUTAGES
+        result = await mcp_service._execute_query(intent)
+        
+        return MCPQueryResponse(
+            success=True,
+            data=result,
+            error=None,
+            query_processed=request.query,
+            query_type="outages",
+            result_count=result.get("count", 0)
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process outages query: {str(e)}"
+        )
 
 

@@ -221,6 +221,30 @@ services:
       timeout: 10s
       retries: 3
 
+  # Audit Service Backend (for integrations)
+  audit-service:
+    build:
+      context: ./backend/services/audit-service
+      dockerfile: Dockerfile
+    container_name: audit-service-backend
+    ports:
+      - "8005:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://audit_user:audit_password@postgres:5432/audit_logs
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - audit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
 
   # Unified API Gateway

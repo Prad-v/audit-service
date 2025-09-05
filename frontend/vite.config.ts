@@ -81,6 +81,10 @@ export default defineConfig({
         target: 'http://host.docker.internal:8003',
         changeOrigin: true,
       },
+      '/api/v1/integrations': {
+        target: 'http://audit-service:8000',
+        changeOrigin: true,
+      },
     },
   },
   build: {

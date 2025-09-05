@@ -5,7 +5,7 @@ const MCPQuery: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">MCP Natural Language Query</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Ask Me</h1>
         <p className="text-gray-600">
           Interact with the FastMCP server to query audit events using natural language. 
           Ask questions about events, trends, analytics, and alerts in a conversational way.

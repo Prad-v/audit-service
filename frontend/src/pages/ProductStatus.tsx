@@ -45,6 +45,8 @@ interface Incident {
   created_at: string
   updated_at: string
   updates: IncidentUpdate[]
+  jira_ticket_id?: string
+  jira_ticket_url?: string
 }
 
 interface IncidentUpdate {
@@ -138,6 +140,8 @@ const ProductStatus: React.FC = () => {
     has_next: false,
     has_prev: false
   })
+  const [jiraConfig, setJiraConfig] = useState<any>(null)
+  const [creatingJiraTicket, setCreatingJiraTicket] = useState<string | null>(null)
 
   // Load incidents and summary
   const loadData = async () => {
@@ -202,7 +206,21 @@ const ProductStatus: React.FC = () => {
 
   useEffect(() => {
     loadData()
+    loadJiraConfig()
   }, [pagination.page, filters])
+
+  // Load Jira configuration
+  const loadJiraConfig = async () => {
+    try {
+      const response = await fetch('/api/v1/integrations/jira/config')
+      if (response.ok) {
+        const config = await response.json()
+        setJiraConfig(config.enabled ? config : null)
+      }
+    } catch (error) {
+      console.error('Failed to load Jira configuration:', error)
+    }
+  }
 
   const handleUpdateIncident = async (incidentId: string, updateData: any) => {
     try {
@@ -217,10 +235,10 @@ const ProductStatus: React.FC = () => {
 
   const handleDeleteIncident = async (incidentId: string) => {
     if (window.confirm('Are you sure you want to delete this incident?')) {
-      try {
+    try {
         await incidentsApi.deleteIncident(incidentId)
-        loadData()
-      } catch (error) {
+      loadData()
+    } catch (error) {
         console.error('Failed to delete incident:', error)
       }
     }
@@ -267,8 +285,8 @@ const ProductStatus: React.FC = () => {
         is_public: true,
         rss_enabled: true
       })
-      loadData()
-    } catch (error) {
+        loadData()
+      } catch (error) {
       console.error('Failed to update incident:', error)
     }
   }
@@ -319,6 +337,44 @@ const ProductStatus: React.FC = () => {
     }
   }
 
+  // Create Jira ticket for incident
+  const handleCreateJiraTicket = async (incident: Incident) => {
+    setCreatingJiraTicket(incident.id)
+    
+    try {
+      const response = await fetch('/api/v1/integrations/jira/create-ticket', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          incident_id: incident.id,
+          incident_data: incident
+        })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok) {
+        // Update the incident with Jira ticket ID
+        await incidentsApi.updateIncident(incident.id, {
+          jira_ticket_id: result.jira_ticket_id,
+          jira_ticket_url: result.jira_ticket_url
+        })
+        
+        alert(`Jira ticket created successfully! Ticket ID: ${result.jira_ticket_id}`)
+        loadData() // Refresh the incident list
+      } else {
+        alert(`Failed to create Jira ticket: ${result.detail || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to create Jira ticket:', error)
+      alert('Failed to create Jira ticket. Please try again.')
+    } finally {
+      setCreatingJiraTicket(null)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'investigating': return 'text-yellow-600 bg-yellow-100'
@@ -366,7 +422,7 @@ const ProductStatus: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Product Status</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Incident Management</h1>
               <p className="mt-2 text-gray-600">
                 Monitor and manage product outages and incidents
               </p>
@@ -722,6 +778,27 @@ const ProductStatus: React.FC = () => {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                      {jiraConfig && !incident.jira_ticket_id && (
+                        <button
+                          onClick={() => handleCreateJiraTicket(incident)}
+                          disabled={creatingJiraTicket === incident.id}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Create Jira Ticket"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                      )}
+                      {incident.jira_ticket_id && (
+                        <a
+                          href={incident.jira_ticket_url || `https://${jiraConfig?.base_url?.replace('https://', '')}/browse/${incident.jira_ticket_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 hover:border-blue-300 hover:text-blue-700"
+                          title="View Jira Ticket"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
                     </div>
                   </div>
                   
@@ -820,10 +897,10 @@ const ProductStatus: React.FC = () => {
       {/* 3. Adding status updates to incidents */}
       
       {/* Example modal structure: */}
-      {/* Create Incident Modal */}
+      {/* Create Incident Slider */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-4 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+          <div className="fixed right-0 top-0 h-full w-11/12 max-w-4xl bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-md">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-900">Create New Incident</h3>
@@ -1041,10 +1118,10 @@ const ProductStatus: React.FC = () => {
         </div>
       )}
 
-      {/* View Incident Modal/Slider */}
+      {/* View Incident Slider */}
       {showViewModal && selectedIncident && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-4 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+          <div className="fixed right-0 top-0 h-full w-11/12 max-w-4xl bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-md">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-900">Incident Details</h3>
@@ -1283,13 +1360,24 @@ const ProductStatus: React.FC = () => {
         </div>
       )}
 
-      {/* Add Update Modal */}
+      {/* Add Update Slider */}
       {showAddUpdateModal && selectedIncident && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Update to Incident</h3>
-              <p className="text-sm text-gray-600 mb-4">Adding update to: <strong>{selectedIncident.title}</strong></p>
+          <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">Add Update to Incident</h3>
+                <button
+                  onClick={() => setShowAddUpdateModal(false)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">Adding update to: <strong>{selectedIncident.title}</strong></p>
+            </div>
+            
+            <div className="px-6 py-6 max-h-96 overflow-y-auto">
               
               <div className="space-y-4">
                 <div>
@@ -1358,7 +1446,10 @@ const ProductStatus: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3 mt-6">
+            </div>
+            
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4">
+              <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => {
                     setShowAddUpdateModal(false)
@@ -1387,10 +1478,10 @@ const ProductStatus: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Incident Modal */}
+      {/* Edit Incident Slider */}
       {showUpdateModal && selectedIncident && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-4 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+          <div className="fixed right-0 top-0 h-full w-11/12 max-w-4xl bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-md">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-900">Edit Incident</h3>

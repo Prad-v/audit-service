@@ -1,9 +1,9 @@
 """
-FastMCP Service for Natural Language Audit Event Queries
+FastMCP Service for Natural Language Queries
 
-This service provides a FastMCP server that allows users to query audit events
-using natural language. It integrates with the audit service to provide
-intelligent search and analysis capabilities.
+This service provides a FastMCP server that allows users to query audit events,
+cloud events, and incidents using natural language. It integrates with the audit service,
+events service, and incidents service to provide intelligent search and analysis capabilities.
 """
 
 import asyncio
@@ -23,6 +23,7 @@ from app.db.database import get_database_manager
 from app.db.schemas import AuditLog
 from app.models.audit import AuditEventType, AuditEventStatus
 from app.services.audit_service import AuditService
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ class QueryType(Enum):
     SUMMARY = "summary"
     TREND = "trend"
     ALERT = "alert"
+    EVENTS = "events"
+    INCIDENTS = "incidents"
+    OUTAGES = "outages"
 
 
 @dataclass
@@ -54,18 +58,20 @@ class MCPAuditService:
     def __init__(self):
         self.audit_service = None
         self.mcp = FastMCP(
-            name="audit-events-mcp",
+            name="audit-events-incidents-mcp",
             instructions="""
-                This server provides natural language query capabilities for audit events.
-                You can ask questions about audit logs, search for specific events,
-                get analytics and trends, and receive alerts about important events.
+                This server provides natural language query capabilities for audit events,
+                cloud events, and incidents. You can ask questions about audit logs, 
+                cloud provider events, incidents, outages, and get analytics and trends.
                 
                 Available query types:
-                - Search: Find specific audit events
-                - Analytics: Get counts and statistics
+                - Search: Find specific audit events, cloud events, or incidents
+                - Analytics: Get counts and statistics across all data types
                 - Trends: Analyze patterns over time
-                - Alerts: Get high-priority events
+                - Alerts: Get high-priority events and incidents
                 - Summary: Get overview reports
+                - Events: Query cloud provider events specifically
+                - Incidents: Query incidents and outages specifically
                 
                 Examples:
                 - "Show me all login events from today"
@@ -73,8 +79,13 @@ class MCPAuditService:
                 - "Get high severity events from the API service"
                 - "Show me trends in user activity over the past week"
                 - "What are the recent security alerts?"
+                - "Show me all AWS events from today"
+                - "What incidents are currently active?"
+                - "Show me cloud provider outages"
+                - "How many incidents were created this week?"
+                - "What are the recent Azure service disruptions?"
             """,
-            include_tags={"audit", "security", "analytics"}
+            include_tags={"audit", "security", "analytics", "events", "incidents", "outages"}
         )
         self._setup_tools()
     
@@ -285,6 +296,103 @@ class MCPAuditService:
                     "api", "frontend", "backend", "database", "auth", "user"
                 ]
             }
+        
+        # Events and Incidents Tools
+        @self.mcp.tool(tags={"events", "search"})
+        async def query_cloud_events(query: str, limit: int = 50) -> Dict[str, Any]:
+            """
+            Query cloud provider events using natural language.
+            
+            Args:
+                query: Natural language query for cloud events
+                limit: Maximum number of results to return (default: 50)
+            
+            Returns:
+                Dictionary containing cloud events query results
+            """
+            try:
+                intent = self._parse_query_intent(query)
+                intent.query_type = QueryType.EVENTS
+                result = await self._execute_query(intent)
+                
+                return {
+                    "success": True,
+                    "data": result,
+                    "query": query,
+                    "limit": limit
+                }
+                
+            except Exception as e:
+                logger.error(f"Error querying cloud events: {e}")
+                return {
+                    "success": False,
+                    "error": f"Failed to query cloud events: {str(e)}",
+                    "query": query
+                }
+        
+        @self.mcp.tool(tags={"incidents", "search"})
+        async def query_incidents(query: str, limit: int = 50) -> Dict[str, Any]:
+            """
+            Query incidents using natural language.
+            
+            Args:
+                query: Natural language query for incidents
+                limit: Maximum number of results to return (default: 50)
+            
+            Returns:
+                Dictionary containing incidents query results
+            """
+            try:
+                intent = self._parse_query_intent(query)
+                intent.query_type = QueryType.INCIDENTS
+                result = await self._execute_query(intent)
+                
+                return {
+                    "success": True,
+                    "data": result,
+                    "query": query,
+                    "limit": limit
+                }
+                
+            except Exception as e:
+                logger.error(f"Error querying incidents: {e}")
+                return {
+                    "success": False,
+                    "error": f"Failed to query incidents: {str(e)}",
+                    "query": query
+                }
+        
+        @self.mcp.tool(tags={"outages", "search"})
+        async def query_outages(query: str, limit: int = 50) -> Dict[str, Any]:
+            """
+            Query cloud provider outages using natural language.
+            
+            Args:
+                query: Natural language query for outages
+                limit: Maximum number of results to return (default: 50)
+            
+            Returns:
+                Dictionary containing outages query results
+            """
+            try:
+                intent = self._parse_query_intent(query)
+                intent.query_type = QueryType.OUTAGES
+                result = await self._execute_query(intent)
+                
+                return {
+                    "success": True,
+                    "data": result,
+                    "query": query,
+                    "limit": limit
+                }
+                
+            except Exception as e:
+                logger.error(f"Error querying outages: {e}")
+                return {
+                    "success": False,
+                    "error": f"Failed to query outages: {str(e)}",
+                    "query": query
+                }
     
     def _parse_query_intent(self, query: str) -> QueryIntent:
         """Parse natural language query to extract intent and filters"""
@@ -382,11 +490,34 @@ class MCPAuditService:
         
         # Extract service names (only if not already extracted as user_id)
         if "user_id" not in filters:
-            service_keywords = ["api", "frontend", "backend", "database", "auth"]
+            service_keywords = ["api", "frontend", "backend", "database", "auth", "s3", "ec2", "lambda", "rds", "dynamodb", "cloudfront", "route53"]
             for keyword in service_keywords:
                 if keyword in query_lower:
                     filters["service_name"] = keyword
                     keywords.append(keyword)
+        
+        # Extract cloud providers
+        provider_mapping = {
+            "aws": "aws",
+            "amazon": "aws",
+            "azure": "azure",
+            "microsoft": "azure",
+            "gcp": "gcp",
+            "google": "gcp",
+            "google cloud": "gcp"
+        }
+        
+        for keyword, provider in provider_mapping.items():
+            if keyword in query_lower:
+                filters["provider"] = provider
+                keywords.append(keyword)
+        
+        # Extract regions
+        region_keywords = ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "north america", "europe", "asia"]
+        for keyword in region_keywords:
+            if keyword in query_lower:
+                filters["region"] = keyword
+                keywords.append(keyword)
         
         # Extract status
         if "success" in query_lower:
@@ -403,7 +534,14 @@ class MCPAuditService:
             limit = 20
         
         # Determine query type
-        if any(word in query_lower for word in ["count", "how many", "total", "unique", "distinct", "types", "kinds", "categories"]):
+        if any(word in query_lower for word in ["incident", "incidents", "outage", "outages"]):
+            if any(word in query_lower for word in ["outage", "outages", "cloud provider", "aws", "azure", "gcp", "google"]):
+                query_type = QueryType.OUTAGES
+            else:
+                query_type = QueryType.INCIDENTS
+        elif any(word in query_lower for word in ["cloud event", "cloud events", "aws event", "azure event", "gcp event", "provider event"]):
+            query_type = QueryType.EVENTS
+        elif any(word in query_lower for word in ["count", "how many", "total", "unique", "distinct", "types", "kinds", "categories"]):
             query_type = QueryType.ANALYTICS
             aggregation = "count"
         elif any(word in query_lower for word in ["trend", "pattern", "over time"]):
@@ -441,6 +579,12 @@ class MCPAuditService:
                 result = await self._get_audit_summary(session, intent)
             elif intent.query_type == QueryType.ALERT:
                 result = await self._get_audit_alerts(session, intent)
+            elif intent.query_type == QueryType.EVENTS:
+                result = await self._query_cloud_events(intent)
+            elif intent.query_type == QueryType.INCIDENTS:
+                result = await self._query_incidents(intent)
+            elif intent.query_type == QueryType.OUTAGES:
+                result = await self._query_outages(intent)
             else:
                 result = await self._search_audit_events(session, intent)
             
@@ -473,11 +617,25 @@ class MCPAuditService:
                     }
                 except Exception as e:
                     logger.error(f"Error generating LLM summary: {e}")
-                    result["llm_summary"] = {
-                        "summary": "Error generating summary. Showing raw results.",
-                        "provider_used": effective_provider_id,
-                        "has_llm_analysis": False
-                    }
+                    # Fallback to mock LLM service
+                    try:
+                        from app.services.mock_llm_service import mock_llm_service
+                        mock_summary = await mock_llm_service.summarize_mcp_result(
+                            intent.original_query, result
+                        )
+                        result["llm_summary"] = {
+                            "summary": mock_summary["summary"],
+                            "provider_used": mock_summary["provider_used"],
+                            "has_llm_analysis": mock_summary["has_llm_analysis"],
+                            "fallback_to_mock": True
+                        }
+                    except Exception as mock_error:
+                        logger.error(f"Error generating mock summary: {mock_error}")
+                        result["llm_summary"] = {
+                            "summary": "Error generating summary. Showing raw results.",
+                            "provider_used": effective_provider_id,
+                            "has_llm_analysis": False
+                        }
             
             return result
         finally:
@@ -763,6 +921,227 @@ class MCPAuditService:
             "filters_applied": intent.filters,
             "keywords": intent.keywords
         }
+    
+    async def _query_cloud_events(self, intent: QueryIntent) -> Dict[str, Any]:
+        """Query cloud events from the events service"""
+        try:
+            # Build query parameters based on intent
+            params = {}
+            
+            # Add time range filters
+            if intent.time_range:
+                if intent.time_range.get('start'):
+                    params['start_time'] = intent.time_range['start'].isoformat()
+                if intent.time_range.get('end'):
+                    params['end_time'] = intent.time_range['end'].isoformat()
+            
+            # Add other filters
+            if intent.filters.get('severity'):
+                params['severity'] = intent.filters['severity']
+            if intent.filters.get('provider'):
+                params['cloud_provider'] = intent.filters['provider']
+            if intent.filters.get('service'):
+                params['service_name'] = intent.filters['service']
+            if intent.filters.get('region'):
+                params['region'] = intent.filters['region']
+            
+            # Add limit
+            if intent.limit:
+                params['limit'] = intent.limit
+            
+            # Query the events service
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "http://events:8003/api/v1/events/events",
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    events = data.get('events', [])
+                    
+                    return {
+                        "type": "cloud_events",
+                        "events": events,
+                        "count": len(events),
+                        "filters_applied": intent.filters,
+                        "keywords": intent.keywords,
+                        "query": intent.original_query
+                    }
+                else:
+                    return {
+                        "type": "cloud_events",
+                        "events": [],
+                        "count": 0,
+                        "error": f"Events service returned status {response.status_code}",
+                        "filters_applied": intent.filters,
+                        "keywords": intent.keywords
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error querying cloud events: {e}")
+            return {
+                "type": "cloud_events",
+                "events": [],
+                "count": 0,
+                "error": f"Failed to query cloud events: {str(e)}",
+                "filters_applied": intent.filters,
+                "keywords": intent.keywords
+            }
+    
+    async def _query_incidents(self, intent: QueryIntent) -> Dict[str, Any]:
+        """Query incidents from the events service"""
+        try:
+            # Build query parameters based on intent
+            params = {}
+            
+            # Add time range filters
+            if intent.time_range:
+                if intent.time_range.get('start'):
+                    params['start_time'] = intent.time_range['start'].isoformat()
+                if intent.time_range.get('end'):
+                    params['end_time'] = intent.time_range['end'].isoformat()
+            
+            # Add other filters
+            if intent.filters.get('severity'):
+                params['severity'] = intent.filters['severity']
+            if intent.filters.get('status'):
+                params['status'] = intent.filters['status']
+            if intent.filters.get('service'):
+                params['affected_services'] = intent.filters['service']
+            if intent.filters.get('region'):
+                params['affected_regions'] = intent.filters['region']
+            
+            # Add limit
+            if intent.limit:
+                params['limit'] = intent.limit
+            
+            # Query the events service for incidents
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "http://events:8003/api/v1/incidents/",
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    incidents = data.get('incidents', [])
+                    
+                    return {
+                        "type": "incidents",
+                        "incidents": incidents,
+                        "count": len(incidents),
+                        "filters_applied": intent.filters,
+                        "keywords": intent.keywords,
+                        "query": intent.original_query
+                    }
+                else:
+                    return {
+                        "type": "incidents",
+                        "incidents": [],
+                        "count": 0,
+                        "error": f"Events service returned status {response.status_code}",
+                        "filters_applied": intent.filters,
+                        "keywords": intent.keywords
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error querying incidents: {e}")
+            return {
+                "type": "incidents",
+                "incidents": [],
+                "count": 0,
+                "error": f"Failed to query incidents: {str(e)}",
+                "filters_applied": intent.filters,
+                "keywords": intent.keywords
+            }
+    
+    async def _query_outages(self, intent: QueryIntent) -> Dict[str, Any]:
+        """Query cloud provider outages from the events service"""
+        try:
+            # Build query parameters based on intent
+            params = {}
+            
+            # Add time range filters
+            if intent.time_range:
+                if intent.time_range.get('start'):
+                    params['start_time'] = intent.time_range['start'].isoformat()
+                if intent.time_range.get('end'):
+                    params['end_time'] = intent.time_range['end'].isoformat()
+            
+            # Add other filters
+            if intent.filters.get('provider'):
+                params['provider'] = intent.filters['provider']
+            if intent.filters.get('service'):
+                params['service'] = intent.filters['service']
+            if intent.filters.get('region'):
+                params['region'] = intent.filters['region']
+            if intent.filters.get('severity'):
+                params['severity'] = intent.filters['severity']
+            
+            # Query the events service for outages
+            async with httpx.AsyncClient() as client:
+                # Try active outages first
+                response = await client.get(
+                    "http://events:8003/api/v1/outages/active",
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    outages = data.get('outages', [])
+                    
+                    return {
+                        "type": "outages",
+                        "outages": outages,
+                        "count": len(outages),
+                        "filters_applied": intent.filters,
+                        "keywords": intent.keywords,
+                        "query": intent.original_query
+                    }
+                else:
+                    # Try historical outages if active fails
+                    response = await client.get(
+                        "http://events:8003/api/v1/outages/history",
+                        params=params,
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        outages = data.get('outages', [])
+                        
+                        return {
+                            "type": "outages",
+                            "outages": outages,
+                            "count": len(outages),
+                            "filters_applied": intent.filters,
+                            "keywords": intent.keywords,
+                            "query": intent.original_query
+                        }
+                    else:
+                        return {
+                            "type": "outages",
+                            "outages": [],
+                            "count": 0,
+                            "error": f"Events service returned status {response.status_code}",
+                            "filters_applied": intent.filters,
+                            "keywords": intent.keywords
+                        }
+                    
+        except Exception as e:
+            logger.error(f"Error querying outages: {e}")
+            return {
+                "type": "outages",
+                "outages": [],
+                "count": 0,
+                "error": f"Failed to query outages: {str(e)}",
+                "filters_applied": intent.filters,
+                "keywords": intent.keywords
+            }
     
     def get_mcp_server(self) -> FastMCP:
         """Get the FastMCP server instance"""

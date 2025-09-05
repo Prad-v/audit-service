@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Cloud, Settings as SettingsIcon, Bot } from 'lucide-react'
+import { Cloud, Settings as SettingsIcon, Bot, Zap } from 'lucide-react'
 import { CloudProjects } from './CloudProjects'
 import LLMProviders from './LLMProviders'
+import { Integrations } from './Integrations'
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<'cloud-projects' | 'llm-providers'>('cloud-projects')
+  const [activeTab, setActiveTab] = useState<'cloud-projects' | 'llm-providers' | 'integrations'>('cloud-projects')
 
   const tabs = [
     {
@@ -18,6 +19,12 @@ export function Settings() {
       name: 'LLM Providers',
       icon: Bot,
       description: 'Configure AI language model providers and API keys'
+    },
+    {
+      id: 'integrations',
+      name: 'Integrations',
+      icon: Zap,
+      description: 'Configure third-party integrations and external services'
     }
   ]
 
@@ -80,6 +87,18 @@ export function Settings() {
               </p>
             </div>
             <LLMProviders />
+          </div>
+        )}
+        
+        {activeTab === 'integrations' && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Integrations</h2>
+              <p className="text-gray-600">
+                Configure third-party integrations and external services for enhanced workflow automation.
+              </p>
+            </div>
+            <Integrations />
           </div>
         )}
       </div>

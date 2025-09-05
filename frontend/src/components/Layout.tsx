@@ -48,13 +48,13 @@ export function Layout({ children }: LayoutProps) {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Audit Logs', href: '/audit-logs', icon: FileText },
     { name: 'Create Event', href: '/create-event', icon: Plus },
-    { name: 'Natural Language Query', href: '/mcp-query', icon: MessageSquare },
+    { name: 'Ask Me', href: '/mcp-query', icon: MessageSquare },
     { name: 'Settings', href: '/settings', icon: Settings },
     { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
     { name: 'Event Framework', href: '/event-framework', icon: Database },
     { name: 'Event Pipeline Builder', href: '/event-pipeline-builder', icon: Database },
-    { name: 'Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
-    { name: 'Product Status', href: '/product-status', icon: AlertTriangle },
+    { name: 'Cloud Provider Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
+    { name: 'Incident Management', href: '/product-status', icon: AlertTriangle },
     { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   ]
 

@@ -28,6 +28,8 @@ interface OutageEvent {
   outage_status: string
   affected_services: string[]
   affected_regions: string[]
+  incident_id?: string
+  incident_url?: string
 }
 
 interface OutageHistoryResponse {
@@ -695,7 +697,7 @@ export function OutageMonitoring() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Outage Monitoring</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Cloud Provider Outage Monitoring</h1>
           <p className="text-gray-600 mt-2">
             Monitor cloud provider outages and status pages
           </p>
@@ -929,11 +931,37 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
       const response = await fetch('/api/v1/outages/active')
       if (response.ok) {
         const data = await response.json()
-        const outages = data.outages || []
-        setActiveOutages(outages)
+        let outages = data.outages || []
+        
+        // Add a dummy event if no real outages exist
+        if (outages.length === 0) {
+          const dummyOutage = {
+            event_id: 'dummy-aws-s3-outage-001',
+            provider: 'aws',
+            service: 'Amazon S3',
+            region: 'us-east-1',
+            severity: 'high',
+            status: 'investigating',
+            title: 'Amazon S3 Service Disruption in US East (N. Virginia)',
+            description: 'We are currently experiencing elevated error rates for Amazon S3 in the US East (N. Virginia) region. Some customers may experience delays in accessing their S3 buckets and objects. Our engineering team is actively investigating and working to resolve this issue. We will provide updates as we have more information.',
+            event_time: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+            resolved_at: null,
+            outage_status: 'active',
+            affected_services: ['Amazon S3', 'Amazon CloudFront'],
+            affected_regions: ['us-east-1', 'us-west-2'],
+            incident_id: undefined, // No incident created yet
+            incident_url: undefined
+          }
+          outages = [dummyOutage]
+        }
+        
+        // Check for existing incidents for each outage
+        const outagesWithIncidents = await checkForExistingIncidents(outages)
+        setActiveOutages(outagesWithIncidents)
+        
         // Notify parent component of the active outages count
         if (onActiveCountChange) {
-          onActiveCountChange(outages.length)
+          onActiveCountChange(outagesWithIncidents.length)
         }
       } else {
         setError('Failed to load active outages')
@@ -943,6 +971,44 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
     } finally {
       setLoading(false)
     }
+  }
+
+  // Check for existing incidents that might be linked to outages
+  const checkForExistingIncidents = async (outages: OutageEvent[]) => {
+    try {
+      // Get all incidents to check for matches
+      const response = await fetch('/api/v1/incidents/')
+      if (response.ok) {
+        const data = await response.json()
+        const incidents = data.incidents || []
+        
+        // Check each outage for matching incidents
+        return outages.map(outage => {
+          // Look for incidents that were created from this outage
+          const matchingIncident = incidents.find((incident: any) => 
+            (incident.internal_notes && 
+             incident.internal_notes.includes(`Outage ID: ${outage.event_id}`)) ||
+            (incident.title && 
+             incident.title.includes(outage.title) &&
+             incident.incident_type === 'outage')
+          )
+          
+          if (matchingIncident) {
+            return {
+              ...outage,
+              incident_id: matchingIncident.id,
+              incident_url: `/product-status?incident=${matchingIncident.id}`
+            }
+          }
+          
+          return outage
+        })
+      }
+    } catch (error) {
+      console.error('Error checking for existing incidents:', error)
+    }
+    
+    return outages
   }
 
   useEffect(() => {
@@ -980,6 +1046,131 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
     }
   }
 
+  const handleCreateIncidentFromOutage = async () => {
+    if (activeOutages.length === 0) return
+    
+    // Use the first active outage to create an incident
+    const outage = activeOutages[0]
+    await createIncidentFromOutage(outage)
+  }
+
+  const handleCreateIncidentFromSpecificOutage = async (outage: any) => {
+    await createIncidentFromOutage(outage)
+  }
+
+  const createIncidentFromOutage = async (outage: any) => {
+    try {
+      // Check if incident already exists for this outage
+      if (outage.incident_id) {
+        alert('An incident has already been created for this outage!')
+        return
+      }
+      
+      // Create incident data from the outage
+      const incidentData = {
+        title: `Incident: ${outage.title}`,
+        description: outage.description,
+        severity: outage.severity === 'critical' ? 'high' : outage.severity === 'high' ? 'medium' : 'low',
+        incident_type: 'outage',
+        affected_services: [outage.service],
+        affected_regions: outage.region ? [outage.region] : [],
+        affected_components: [],
+        start_time: outage.event_time,
+        estimated_resolution: null, // Use null instead of empty string for optional datetime
+        public_message: `We are currently experiencing issues with ${outage.service}. Our team is investigating and working to resolve this issue.`,
+        internal_notes: `Created from outage monitoring: ${outage.provider} - ${outage.service}. Outage ID: ${outage.event_id}`,
+        assigned_to: '',
+        tags: [outage.provider, outage.service, 'outage-created'],
+        is_public: true,
+        rss_enabled: true
+      }
+
+      // Call the incident API to create the incident
+      const response = await fetch('/api/v1/incidents/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(incidentData)
+      })
+
+      if (response.ok) {
+        const createdIncident = await response.json()
+        const incidentId = createdIncident.incident?.id
+        
+        if (incidentId) {
+          // Link the incident to the outage
+          await linkIncidentToOutage(outage.event_id, incidentId)
+          
+          // Update the local outage state to reflect the incident creation
+          setActiveOutages(prevOutages => 
+            prevOutages.map(o => 
+              o.event_id === outage.event_id 
+                ? { 
+                    ...o, 
+                    incident_id: incidentId,
+                    incident_url: `/product-status?incident=${incidentId}`
+                  }
+                : o
+            )
+          )
+        }
+        
+        alert(`Incident created successfully! ID: ${incidentId || 'Unknown'}`)
+        // Don't redirect immediately - let user see the updated state
+        // window.location.href = '/product-status'
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to create incident:', errorData)
+        
+        // Provide more detailed error message
+        let errorMessage = 'Failed to create incident: '
+        if (errorData.detail && Array.isArray(errorData.detail)) {
+          // Handle validation errors
+          const validationErrors = errorData.detail.map((err: any) => 
+            `${err.loc?.join('.')}: ${err.msg}`
+          ).join(', ')
+          errorMessage += validationErrors
+        } else if (errorData.detail) {
+          errorMessage += errorData.detail
+        } else {
+          errorMessage += 'Unknown error'
+        }
+        
+        alert(errorMessage)
+      }
+    } catch (error) {
+      console.error('Failed to create incident from outage:', error)
+      alert('Failed to create incident. Please try again.')
+    }
+  }
+
+  // Link incident to outage in the backend
+  const linkIncidentToOutage = async (outageId: string, incidentId: string) => {
+    try {
+      const response = await fetch('/api/v1/incidents/link-incident', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          outage_id: outageId,
+          incident_id: incidentId
+        })
+      })
+
+      if (!response.ok) {
+        console.warn('Failed to link incident to outage:', response.statusText)
+        // For now, just log the link locally since the backend endpoint might not be ready
+        console.log(`Linking incident ${incidentId} to outage ${outageId}`)
+      }
+    } catch (error) {
+      console.warn('Failed to link incident to outage:', error)
+      // For now, just log the link locally since the backend endpoint might not be ready
+      console.log(`Linking incident ${incidentId} to outage ${outageId}`)
+    }
+  }
+
   if (loading) {
     return (
       <div className="card">
@@ -1011,14 +1202,31 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Active Incidents</h2>
-        <button
-          onClick={loadActiveOutages}
-          disabled={loading}
-          className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center text-sm"
-        >
-          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleCreateIncidentFromOutage()}
+            disabled={loading || activeOutages.length === 0 || activeOutages.every(outage => outage.incident_id)}
+            className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm"
+            title={
+              activeOutages.length === 0 
+                ? "No active outages to create incident from" 
+                : activeOutages.every(outage => outage.incident_id)
+                ? "All active outages already have incidents"
+                : "Create incident from active outage"
+            }
+          >
+            <AlertTriangle className="w-4 h-4 mr-1" />
+            Create Incident
+          </button>
+          <button
+            onClick={loadActiveOutages}
+            disabled={loading}
+            className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center text-sm"
+          >
+            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {activeOutages.length === 0 ? (
@@ -1028,6 +1236,7 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
           </div>
           <p className="text-gray-600">No active incidents detected</p>
           <p className="text-sm text-gray-500 mt-1">All cloud services are operating normally</p>
+          <p className="text-xs text-gray-400 mt-2">Note: A demo event will be shown for testing purposes</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1042,6 +1251,11 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(outage.status)}`}>
                       {outage.status}
                     </span>
+                    {outage.event_id?.startsWith('dummy-') && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        Demo Event
+                      </span>
+                    )}
                   </div>
                   
                   <h3 className="font-medium text-gray-900 mb-1">{outage.title}</h3>
@@ -1064,6 +1278,34 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
                       <span className="text-gray-500">Started:</span>
                       <span className="ml-2 font-medium">{formatDateTime(outage.event_time)}</span>
                     </div>
+                  </div>
+                  
+                  <div className="mt-4 flex justify-end">
+                    {outage.incident_id ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-green-600 font-medium">
+                          ✓ Incident Created
+                        </span>
+                        <a
+                          href={outage.incident_url || `/product-status?incident=${outage.incident_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View Incident
+                        </a>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleCreateIncidentFromSpecificOutage(outage)}
+                        disabled={false}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        Create Incident
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -6,10 +6,12 @@ including creation, updates, status changes, and RSS feed generation.
 """
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
 from sqlalchemy import desc, and_, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +26,7 @@ from app.services.cloud_event_service import create_cloud_event
 from app.services.rss_service import generate_rss_feed
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
+logger = logging.getLogger(__name__)
 
 
 def generate_incident_id() -> str:
@@ -285,6 +288,25 @@ async def list_incidents(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list incidents: {str(e)}"
         )
+
+
+class LinkIncidentRequest(BaseModel):
+    outage_id: str
+    incident_id: str
+
+# In-memory storage for demo (in production, use database)
+outage_incident_links = {}
+
+@router.post("/link-incident")
+async def link_incident_to_outage(request: LinkIncidentRequest):
+    """Link an incident to an outage for tracking purposes"""
+    try:
+        outage_incident_links[request.outage_id] = request.incident_id
+        logger.info(f"Linked incident {request.incident_id} to outage {request.outage_id}")
+        return {"success": True, "message": "Incident linked to outage successfully"}
+    except Exception as e:
+        logger.error(f"Failed to link incident to outage: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{incident_id}", response_model=IncidentResponse)

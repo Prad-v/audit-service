@@ -107,6 +107,27 @@ class LLMService:
                 is_default=provider.is_default
             )
     
+    async def _get_provider_with_api_key(self, provider_id: str) -> Optional[LLMProvider]:
+        """Get LLM provider with API key for internal use"""
+        async with self.db_manager.get_session() as session:
+            result = await session.execute(
+                select(LLMProvider).where(LLMProvider.provider_id == provider_id)
+            )
+            return result.scalar_one_or_none()
+    
+    async def _update_provider_status(self, provider_id: str, status: LLMProviderStatus) -> None:
+        """Update provider status"""
+        async with self.db_manager.get_session() as session:
+            result = await session.execute(
+                select(LLMProvider).where(LLMProvider.provider_id == provider_id)
+            )
+            provider = result.scalar_one_or_none()
+            
+            if provider:
+                provider.status = status.value
+                provider.updated_at = datetime.utcnow()
+                await session.commit()
+    
     async def list_providers(self, skip: int = 0, limit: int = 100) -> LLMProviderListResponse:
         """List all LLM providers"""
         async with self.db_manager.get_session() as session:
@@ -214,7 +235,8 @@ class LLMService:
     
     async def test_provider(self, provider_id: str) -> Dict[str, Any]:
         """Test LLM provider connection"""
-        provider = await self.get_provider(provider_id)
+        # Get provider with API key for testing
+        provider = await self._get_provider_with_api_key(provider_id)
         if not provider:
             raise ValueError(f"Provider {provider_id} not found")
 
@@ -247,6 +269,9 @@ class LLMService:
                 
                 response = completion(**test_params)
                 
+                # Update provider status to active on successful test
+                await self._update_provider_status(provider_id, LLMProviderStatus.ACTIVE)
+                
                 return {
                     "success": True,
                     "message": "Connection successful",
@@ -275,7 +300,13 @@ class LLMService:
                 import httpx
                 
                 headers = {"x-api-key": provider.api_key}
-                url = f"{provider.base_url or 'https://api.anthropic.com'}/v1/models"
+                # Ensure we don't double up on /v1 in the URL
+                if provider.base_url and provider.base_url.endswith('/v1'):
+                    url = f"{provider.base_url}/models"
+                elif provider.base_url:
+                    url = f"{provider.base_url}/v1/models"
+                else:
+                    url = "https://api.anthropic.com/v1/models"
                 
                 async with httpx.AsyncClient() as client:
                     response = await client.get(url, headers=headers)
@@ -295,6 +326,8 @@ class LLMService:
                 
         except Exception as e:
             logger.error(f"Error testing provider {provider_id}: {e}")
+            # Update provider status to error on failed test
+            await self._update_provider_status(provider_id, LLMProviderStatus.ERROR)
             return {
                 "success": False,
                 "message": f"Connection failed: {str(e)}"
@@ -556,8 +589,10 @@ class LLMService:
             )
         
         try:
-            # Get the provider
-            provider = await self.get_provider(request.provider_id)
+            # Get the provider with API key for internal use
+            provider = await self._get_provider_with_api_key(request.provider_id)
+            if not provider:
+                raise NotFoundError(f"LLM provider {request.provider_id} not found")
             
             if provider.status != LLMProviderStatus.ACTIVE:
                 return LLMSummaryResponse(
@@ -579,14 +614,10 @@ class LLMService:
             
         except Exception as e:
             logger.error(f"Error summarizing MCP result: {e}")
-            return LLMSummaryResponse(
-                summary=f"Error generating summary: {str(e)}. Showing raw results.",
-                provider_used=request.provider_id,
-                raw_result=request.mcp_result,
-                has_llm_analysis=False
-            )
+            # Re-raise the exception so MCP service can handle fallback
+            raise
     
-    async def _generate_summary(self, provider: LLMProviderResponse, query: str, mcp_result: Dict[str, Any]) -> str:
+    async def _generate_summary(self, provider: LLMProvider, query: str, mcp_result: Dict[str, Any]) -> str:
         """Generate summary using LLM"""
         try:
             if provider.provider_type == LLMProviderType.LITELLM:
@@ -597,16 +628,9 @@ class LLMService:
             logger.error(f"Error generating summary with {provider.provider_type}: {str(e)}")
             raise
     
-    async def _generate_litellm_summary(self, provider: LLMProviderResponse, query: str, mcp_result: Dict[str, Any]) -> str:
+    async def _generate_litellm_summary(self, provider: LLMProvider, query: str, mcp_result: Dict[str, Any]) -> str:
         """Generate summary using LiteLLM"""
         from litellm import completion
-        
-        # Get provider config from database
-        async with self.db_manager.get_session() as session:
-            result = await session.execute(
-                select(LLMProvider).where(LLMProvider.provider_id == provider.provider_id)
-            )
-            db_provider = result.scalar_one()
         
         # Prepare prompt
         prompt = self._create_summary_prompt(query, mcp_result)
@@ -615,29 +639,22 @@ class LLMService:
         response = completion(
             model=provider.model_name,
             messages=[{"role": "user", "content": prompt}],
-            api_key=db_provider.api_key,
-            base_url=db_provider.base_url,
-            **(db_provider.litellm_config or {})
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+            **(provider.litellm_config or {})
         )
         
         return response.choices[0].message.content
     
-    async def _generate_standard_summary(self, provider: LLMProviderResponse, query: str, mcp_result: Dict[str, Any]) -> str:
+    async def _generate_standard_summary(self, provider: LLMProvider, query: str, mcp_result: Dict[str, Any]) -> str:
         """Generate summary using standard provider"""
-        # Get provider config from database
-        async with self.db_manager.get_session() as session:
-            result = await session.execute(
-                select(LLMProvider).where(LLMProvider.provider_id == provider.provider_id)
-            )
-            db_provider = result.scalar_one()
-        
         # Prepare prompt
         prompt = self._create_summary_prompt(query, mcp_result)
         
         if provider.provider_type == LLMProviderType.OPENAI:
-            return await self._call_openai_summary(db_provider, prompt)
+            return await self._call_openai_summary(provider, prompt)
         elif provider.provider_type == LLMProviderType.ANTHROPIC:
-            return await self._call_anthropic_summary(db_provider, prompt)
+            return await self._call_anthropic_summary(provider, prompt)
         else:
             raise ValidationError(f"Provider type {provider.provider_type} not implemented for summarization")
     
@@ -664,7 +681,13 @@ class LLMService:
     
     async def _call_anthropic_summary(self, provider: LLMProvider, prompt: str) -> str:
         """Call Anthropic for summarization"""
-        url = f"{provider.base_url}/messages"
+        # Ensure we don't double up on /v1 in the URL
+        if provider.base_url and provider.base_url.endswith('/v1'):
+            url = f"{provider.base_url}/messages"
+        elif provider.base_url:
+            url = f"{provider.base_url}/v1/messages"
+        else:
+            url = "https://api.anthropic.com/v1/messages"
         headers = {
             "x-api-key": provider.api_key,
             "Content-Type": "application/json",
