@@ -1,13 +1,20 @@
 import { useState } from 'react'
-import { AlertTriangle, Filter, Bell, Settings } from 'lucide-react'
+import { AlertTriangle, Filter, Bell, Settings, List } from 'lucide-react'
 import { AlertRules } from './AlertRules'
 import { AlertPolicies } from './AlertPolicies'
 import { AlertProviders } from './AlertProviders'
+import { Alerts } from './Alerts'
 
 export function AlertManagement() {
-  const [activeTab, setActiveTab] = useState<'rules' | 'policies' | 'providers'>('rules')
+  const [activeTab, setActiveTab] = useState<'alerts' | 'rules' | 'policies' | 'providers'>('alerts')
 
   const tabs = [
+    {
+      id: 'alerts',
+      name: 'Active Alerts',
+      icon: List,
+      description: 'View and manage active alerts and notifications'
+    },
     {
       id: 'rules',
       name: 'Alert Rules',
@@ -66,6 +73,18 @@ export function AlertManagement() {
 
       {/* Tab Content */}
       <div className="mt-6">
+        {activeTab === 'alerts' && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Active Alerts</h2>
+              <p className="text-gray-600">
+                View and manage active alerts, notifications, and their current status.
+              </p>
+            </div>
+            <Alerts />
+          </div>
+        )}
+        
         {activeTab === 'rules' && (
           <div>
             <div className="mb-6">

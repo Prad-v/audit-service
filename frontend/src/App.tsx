@@ -9,7 +9,6 @@ import { Settings } from './pages/Settings'
 import { AlertManagement } from './pages/AlertManagement'
 import { EventFramework } from './pages/EventFramework'
 import EventPipelineBuilder from './pages/EventPipelineBuilder'
-import { Alerts } from './pages/Alerts'
 import { OutageMonitoring } from './pages/OutageMonitoring'
 import ProductStatus from './pages/ProductStatus'
 import { FeatureFlagsProvider, useFeatureFlags } from './contexts/FeatureFlagsContext'
@@ -33,7 +32,6 @@ function AppRoutes() {
       {isFeatureEnabled('eventPipeline') && (
         <Route path="/event-pipeline-builder" element={<EventPipelineBuilder />} />
       )}
-      <Route path="/alerts" element={<Alerts />} />
       <Route path="/outage-monitoring" element={<OutageMonitoring />} />
       <Route path="/product-status" element={<ProductStatus />} />
     </Routes>

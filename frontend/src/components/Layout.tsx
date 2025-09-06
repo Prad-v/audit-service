@@ -65,7 +65,6 @@ export function Layout({ children }: LayoutProps) {
   const otherNavigation = [
     { name: 'Cloud Provider Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
     { name: 'Incident Management', href: '/product-status', icon: AlertTriangle },
-    { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   ]
 
   const navigation = [...baseNavigation, ...featureFlaggedNavigation, ...otherNavigation]

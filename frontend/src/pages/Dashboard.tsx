@@ -1,11 +1,17 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Activity, FileText, Plus, Clock, BookOpen, Database, Zap, MessageSquare, TrendingUp, BarChart3, Cpu, HardDrive, Settings } from 'lucide-react'
+import { Activity, FileText, Plus, Clock, BookOpen, Database, Zap, MessageSquare, TrendingUp, BarChart3, Cpu, HardDrive, Settings, AlertTriangle } from 'lucide-react'
 import { auditApi, type AuditEvent, type TopEventType } from '@/lib/api'
 import { useAppSettings } from '../contexts/AppSettingsContext'
+import { ExecutiveSummary } from '../components/ExecutiveSummary'
+import { TimeRangeSelector } from '../components/TimeRangeSelector'
 
 export function Dashboard() {
   const { getAppSetting } = useAppSettings()
+  const [showHistorical, setShowHistorical] = useState(false)
+  const [timeRange, setTimeRange] = useState(24) // hours
+  
   const { data: healthData } = useQuery({
     queryKey: ['health'],
     queryFn: auditApi.getHealth,
@@ -85,6 +91,20 @@ export function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600">Welcome to the {getAppSetting('appName')} dashboard</p>
       </div>
+
+      {/* Time Range Selector */}
+      <TimeRangeSelector
+        showHistorical={showHistorical}
+        timeRange={timeRange}
+        onToggleHistorical={setShowHistorical}
+        onTimeRangeChange={setTimeRange}
+      />
+
+      {/* Executive Summary */}
+      <ExecutiveSummary
+        showHistorical={showHistorical}
+        timeRange={timeRange}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
