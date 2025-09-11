@@ -96,6 +96,14 @@ Once started, the following services will be available:
 - **Real-time Processing**: Async event processing and alert delivery
 - **Scalable Architecture**: Horizontal scaling support
 
+### Third-Party Integrations
+- **Jira Integration**: Automatic ticket creation for incidents with priority mapping
+- **StackStorm Integration**: Trigger automated workflows and incident response actions
+- **PagerDuty Integration**: Incident escalation and on-call management with severity mapping
+- **Webhook Integration**: Flexible HTTP webhook support for custom integrations
+- **Configuration Management**: Secure credential storage and connection testing
+- **Retry Logic**: Built-in retry mechanisms with configurable timeouts
+
 ### Event Management System
 - **Event Subscriptions**: Support for multiple input sources (Webhook, HTTP Client, Pub/Sub, Kinesis, PagerDuty, NATS)
 - **Event Processors**: Transform and enrich events using custom logic
@@ -463,6 +471,34 @@ kubectl delete namespace <namespace>
 - Custom business alerts
 
 For detailed Helm chart documentation, see [helm/audit-service/README.md](helm/audit-service/README.md) and [docs/helm-chart-migration.md](docs/helm-chart-migration.md).
+
+## 📚 Documentation
+
+### Core Documentation
+- [Quick Start Guide](docs/guides/quick-start.md) - Get up and running quickly
+- [Developer Onboarding](docs/developer-onboarding.md) - Development setup and guidelines
+- [Production Readiness](docs/production-readiness.md) - Production deployment checklist
+- [Troubleshooting Guide](docs/troubleshooting.md) - Common issues and solutions
+
+### Integrations
+- [Integrations Guide](docs/integrations.md) - Complete guide to third-party integrations
+  - Jira Integration - Ticket creation and management
+  - StackStorm Integration - Automated workflow triggers
+  - PagerDuty Integration - Incident escalation and on-call management
+  - Webhook Integration - Custom HTTP webhook support
+
+### API Documentation
+- [API Reference](docs/api/README.md) - Complete API documentation
+- Interactive API docs available at http://localhost:8000/docs when running
+
+### Deployment
+- [Deployment Guide](docs/deployment.md) - Production deployment instructions
+- [Helm Chart Migration](docs/helm-chart-migration.md) - Kubernetes deployment guide
+- [Cloud Migration](docs/cloud-migration.md) - Cloud provider migration guide
+
+### Monitoring & Operations
+- [Monitoring Guide](docs/monitoring.md) - Observability and monitoring setup
+- [Testing & Troubleshooting](docs/testing-troubleshooting.md) - Testing strategies and debugging
 
 ## 🔍 Monitoring
 

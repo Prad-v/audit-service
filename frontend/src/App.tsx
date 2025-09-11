@@ -2,7 +2,6 @@ import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { AuditLogs } from './pages/AuditLogs'
-import { CreateEvent } from './pages/CreateEvent'
 import { EventDetails } from './pages/EventDetails'
 import MCPQuery from './pages/MCPQuery'
 import { Settings } from './pages/Settings'
@@ -21,7 +20,6 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/audit-logs" element={<AuditLogs />} />
-      <Route path="/create-event" element={<CreateEvent />} />
       <Route path="/events/:id" element={<EventDetails />} />
       <Route path="/mcp-query" element={<MCPQuery />} />
       <Route path="/settings" element={<Settings />} />

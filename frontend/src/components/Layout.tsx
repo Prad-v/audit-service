@@ -1,10 +1,11 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, FileText, Plus, Home, BookOpen, Heart, MessageSquare, Settings, AlertTriangle, Database, WifiOff } from 'lucide-react'
+import { Activity, FileText, Home, BookOpen, Heart, Settings, AlertTriangle, Database, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { auditApi } from '@/lib/api'
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext'
 import { useAppSettings } from '../contexts/AppSettingsContext'
+import { ChatSupport } from './ChatSupport'
 
 interface LayoutProps {
   children: ReactNode
@@ -50,11 +51,9 @@ export function Layout({ children }: LayoutProps) {
 
   const baseNavigation = [
     { name: 'Dashboard', href: '/', icon: Home },
+    { name: 'Incident Management', href: '/product-status', icon: AlertTriangle },
     { name: 'Audit Logs', href: '/audit-logs', icon: FileText },
-    { name: 'Create Event', href: '/create-event', icon: Plus },
-    { name: 'Ask Me', href: '/mcp-query', icon: MessageSquare },
     { name: 'Settings', href: '/settings', icon: Settings },
-    { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
   ]
 
   const featureFlaggedNavigation = [
@@ -64,7 +63,7 @@ export function Layout({ children }: LayoutProps) {
 
   const otherNavigation = [
     { name: 'Cloud Provider Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
-    { name: 'Incident Management', href: '/product-status', icon: AlertTriangle },
+    { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
   ]
 
   const navigation = [...baseNavigation, ...featureFlaggedNavigation, ...otherNavigation]
@@ -160,6 +159,9 @@ export function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
+      
+      {/* Chat Support */}
+      <ChatSupport />
     </div>
   )
 }

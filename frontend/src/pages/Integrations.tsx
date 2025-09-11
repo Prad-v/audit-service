@@ -8,7 +8,10 @@ import {
   EyeOff, 
   ExternalLink,
   AlertTriangle,
-  Info
+  Info,
+  Zap,
+  Bell,
+  Webhook
 } from 'lucide-react'
 
 interface JiraConfig {
@@ -30,6 +33,40 @@ interface JiraConfig {
   }
 }
 
+interface StackStormConfig {
+  enabled: boolean
+  base_url: string
+  api_key: string
+  timeout: number
+  retry_count: number
+  ignore_ssl: boolean
+}
+
+interface PagerDutyConfig {
+  enabled: boolean
+  integration_key: string
+  service_id: string
+  escalation_policy_id: string
+  severity_mapping: {
+    critical: string
+    high: string
+    medium: string
+    low: string
+  }
+}
+
+interface WebhookConfig {
+  enabled: boolean
+  url: string
+  method: 'POST' | 'PUT' | 'PATCH'
+  headers: {
+    [key: string]: string
+  }
+  timeout: number
+  retry_count: number
+  verify_ssl: boolean
+}
+
 const defaultJiraConfig: JiraConfig = {
   enabled: false,
   instance_type: 'cloud',
@@ -47,17 +84,65 @@ const defaultJiraConfig: JiraConfig = {
   custom_fields: {}
 }
 
+const defaultStackStormConfig: StackStormConfig = {
+  enabled: false,
+  base_url: '',
+  api_key: '',
+  timeout: 30,
+  retry_count: 3,
+  ignore_ssl: false
+}
+
+const defaultPagerDutyConfig: PagerDutyConfig = {
+  enabled: false,
+  integration_key: '',
+  service_id: '',
+  escalation_policy_id: '',
+  severity_mapping: {
+    critical: 'critical',
+    high: 'error',
+    medium: 'warning',
+    low: 'info'
+  }
+}
+
+const defaultWebhookConfig: WebhookConfig = {
+  enabled: false,
+  url: '',
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  timeout: 30,
+  retry_count: 3,
+  verify_ssl: true
+}
+
 export function Integrations() {
   const [jiraConfig, setJiraConfig] = useState<JiraConfig>(defaultJiraConfig)
+  const [stackStormConfig, setStackStormConfig] = useState<StackStormConfig>(defaultStackStormConfig)
+  const [pagerDutyConfig, setPagerDutyConfig] = useState<PagerDutyConfig>(defaultPagerDutyConfig)
+  const [webhookConfig, setWebhookConfig] = useState<WebhookConfig>(defaultWebhookConfig)
+  
   const [showApiToken, setShowApiToken] = useState(false)
+  const [showStackStormApiKey, setShowStackStormApiKey] = useState(false)
+  const [showPagerDutyKey, setShowPagerDutyKey] = useState(false)
+  
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<{ success: boolean; message: string } | null>(null)
+  
+  // StackStorm specific test states
+  const [stackStormTesting, setStackStormTesting] = useState(false)
+  const [stackStormTestResult, setStackStormTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
   // Load configuration on component mount
   useEffect(() => {
     loadJiraConfig()
+    loadStackStormConfig()
+    loadPagerDutyConfig()
+    loadWebhookConfig()
   }, [])
 
   const loadJiraConfig = async () => {
@@ -72,8 +157,65 @@ export function Integrations() {
     }
   }
 
+  const loadStackStormConfig = async () => {
+    try {
+      const response = await fetch('/api/v1/integrations/stackstorm/config')
+      if (response.ok) {
+        const config = await response.json()
+        setStackStormConfig({ ...defaultStackStormConfig, ...config })
+      }
+    } catch (error) {
+      console.error('Failed to load StackStorm configuration:', error)
+    }
+  }
+
+  const loadPagerDutyConfig = async () => {
+    try {
+      const response = await fetch('/api/v1/integrations/pagerduty/config')
+      if (response.ok) {
+        const config = await response.json()
+        setPagerDutyConfig({ ...defaultPagerDutyConfig, ...config })
+      }
+    } catch (error) {
+      console.error('Failed to load PagerDuty configuration:', error)
+    }
+  }
+
+  const loadWebhookConfig = async () => {
+    try {
+      const response = await fetch('/api/v1/integrations/webhook/config')
+      if (response.ok) {
+        const config = await response.json()
+        setWebhookConfig({ ...defaultWebhookConfig, ...config })
+      }
+    } catch (error) {
+      console.error('Failed to load Webhook configuration:', error)
+    }
+  }
+
   const handleJiraConfigChange = (field: keyof JiraConfig, value: any) => {
     setJiraConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleStackStormConfigChange = (field: keyof StackStormConfig, value: any) => {
+    setStackStormConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handlePagerDutyConfigChange = (field: keyof PagerDutyConfig, value: any) => {
+    setPagerDutyConfig(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleWebhookConfigChange = (field: keyof WebhookConfig, value: any) => {
+    setWebhookConfig(prev => ({
       ...prev,
       [field]: value
     }))
@@ -142,6 +284,33 @@ export function Integrations() {
       setSaveResult({ success: false, message: 'Failed to save configuration. Please try again.' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const testStackStormConnection = async () => {
+    setStackStormTesting(true)
+    setStackStormTestResult(null)
+    
+    try {
+      const response = await fetch('/api/v1/integrations/stackstorm/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(stackStormConfig)
+      })
+
+      const result = await response.json()
+      
+      if (response.ok) {
+        setStackStormTestResult({ success: true, message: 'StackStorm connection successful!' })
+      } else {
+        setStackStormTestResult({ success: false, message: result.detail || 'Connection failed. Please check your configuration.' })
+      }
+    } catch (error) {
+      setStackStormTestResult({ success: false, message: 'Failed to test connection. Please try again.' })
+    } finally {
+      setStackStormTesting(false)
     }
   }
 
@@ -460,38 +629,502 @@ export function Integrations() {
         </div>
       </div>
 
-      {/* Future Integrations Placeholder */}
+      {/* StackStorm Integration */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">More Integrations Coming Soon</h3>
-          <p className="text-sm text-gray-500">
-            We're working on adding more integrations to enhance your workflow
-          </p>
-        </div>
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 border border-gray-200 rounded-lg text-center">
-              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                <AlertTriangle className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-orange-600" />
+                </div>
               </div>
-              <h4 className="font-medium text-gray-900">PagerDuty</h4>
-              <p className="text-sm text-gray-500">Incident escalation and on-call management</p>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">StackStorm Integration</h3>
+                <p className="text-sm text-gray-500">
+                  Connect with StackStorm for automated incident response workflows
+                </p>
+              </div>
             </div>
-            <div className="p-4 border border-gray-200 rounded-lg text-center">
-              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                <AlertTriangle className="w-5 h-5 text-gray-400" />
-              </div>
-              <h4 className="font-medium text-gray-900">Slack</h4>
-              <p className="text-sm text-gray-500">Team notifications and collaboration</p>
-            </div>
-            <div className="p-4 border border-gray-200 rounded-lg text-center">
-              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                <AlertTriangle className="w-5 h-5 text-gray-400" />
-              </div>
-              <h4 className="font-medium text-gray-900">Microsoft Teams</h4>
-              <p className="text-sm text-gray-500">Enterprise communication and alerts</p>
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                stackStormConfig.enabled 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {stackStormConfig.enabled ? (
+                  <>
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Enabled
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Disabled
+                  </>
+                )}
+              </span>
             </div>
           </div>
+        </div>
+
+        <div className="px-6 py-4 space-y-6">
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Enable StackStorm Integration</h4>
+              <p className="text-sm text-gray-500">Allow triggering StackStorm actions from incidents</p>
+            </div>
+            <button
+              onClick={() => handleStackStormConfigChange('enabled', !stackStormConfig.enabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                stackStormConfig.enabled ? 'bg-orange-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  stackStormConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {stackStormConfig.enabled && (
+            <>
+              {/* Base URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  StackStorm Base URL
+                </label>
+                <input
+                  type="url"
+                  value={stackStormConfig.base_url}
+                  onChange={(e) => handleStackStormConfigChange('base_url', e.target.value)}
+                  placeholder="https://stackstorm.your-company.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              {/* API Key */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showStackStormApiKey ? 'text' : 'password'}
+                    value={stackStormConfig.api_key}
+                    onChange={(e) => handleStackStormConfigChange('api_key', e.target.value)}
+                    placeholder="Enter your StackStorm API key"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStackStormApiKey(!showStackStormApiKey)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    {showStackStormApiKey ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* SSL Configuration */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900">Ignore SSL Certificate Verification</h4>
+                  <p className="text-sm text-gray-500">Skip SSL certificate validation (not recommended for production)</p>
+                </div>
+                <button
+                  onClick={() => handleStackStormConfigChange('ignore_ssl', !stackStormConfig.ignore_ssl)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    stackStormConfig.ignore_ssl ? 'bg-orange-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      stackStormConfig.ignore_ssl ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Timeout and Retry Configuration */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Timeout (seconds)
+                  </label>
+                  <input
+                    type="number"
+                    value={stackStormConfig.timeout}
+                    onChange={(e) => handleStackStormConfigChange('timeout', parseInt(e.target.value))}
+                    min="1"
+                    max="300"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Retry Count
+                  </label>
+                  <input
+                    type="number"
+                    value={stackStormConfig.retry_count}
+                    onChange={(e) => handleStackStormConfigChange('retry_count', parseInt(e.target.value))}
+                    min="0"
+                    max="10"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+
+              {/* Test Connection */}
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={testStackStormConnection}
+                  disabled={stackStormTesting || !stackStormConfig.base_url || !stackStormConfig.api_key}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <TestTube className="w-4 h-4 mr-2" />
+                  {stackStormTesting ? 'Testing...' : 'Test Connectivity'}
+                </button>
+                
+                {stackStormTestResult && (
+                  <div className={`flex items-center space-x-2 ${
+                    stackStormTestResult.success ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {stackStormTestResult.success ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <XCircle className="w-4 h-4" />
+                    )}
+                    <span className="text-sm">{stackStormTestResult.message}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* PagerDuty Integration */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-red-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">PagerDuty Integration</h3>
+                <p className="text-sm text-gray-500">
+                  Connect with PagerDuty for incident escalation and on-call management
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                pagerDutyConfig.enabled 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {pagerDutyConfig.enabled ? (
+                  <>
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Enabled
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Disabled
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 space-y-6">
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Enable PagerDuty Integration</h4>
+              <p className="text-sm text-gray-500">Allow creating PagerDuty incidents from alerts</p>
+            </div>
+            <button
+              onClick={() => handlePagerDutyConfigChange('enabled', !pagerDutyConfig.enabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                pagerDutyConfig.enabled ? 'bg-red-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  pagerDutyConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {pagerDutyConfig.enabled && (
+            <>
+              {/* Integration Key */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Integration Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPagerDutyKey ? 'text' : 'password'}
+                    value={pagerDutyConfig.integration_key}
+                    onChange={(e) => handlePagerDutyConfigChange('integration_key', e.target.value)}
+                    placeholder="Enter your PagerDuty integration key"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPagerDutyKey(!showPagerDutyKey)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    {showPagerDutyKey ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Service and Escalation Policy */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Service ID
+                  </label>
+                  <input
+                    type="text"
+                    value={pagerDutyConfig.service_id}
+                    onChange={(e) => handlePagerDutyConfigChange('service_id', e.target.value)}
+                    placeholder="PXXXXXXXX"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Escalation Policy ID
+                  </label>
+                  <input
+                    type="text"
+                    value={pagerDutyConfig.escalation_policy_id}
+                    onChange={(e) => handlePagerDutyConfigChange('escalation_policy_id', e.target.value)}
+                    placeholder="PXXXXXXXX"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              </div>
+
+              {/* Severity Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Severity Mapping
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(pagerDutyConfig.severity_mapping).map(([severity, level]) => (
+                    <div key={severity} className="flex items-center space-x-3">
+                      <span className="w-20 text-sm font-medium text-gray-700 capitalize">
+                        {severity}:
+                      </span>
+                      <select
+                        value={level}
+                        onChange={(e) => handlePagerDutyConfigChange('severity_mapping', {
+                          ...pagerDutyConfig.severity_mapping,
+                          [severity]: e.target.value
+                        })}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        <option value="critical">Critical</option>
+                        <option value="error">Error</option>
+                        <option value="warning">Warning</option>
+                        <option value="info">Info</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Webhook Integration */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Webhook className="w-5 h-5 text-purple-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Webhook Integration</h3>
+                <p className="text-sm text-gray-500">
+                  Send incident data to external systems via HTTP webhooks
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                webhookConfig.enabled 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {webhookConfig.enabled ? (
+                  <>
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Enabled
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Disabled
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 space-y-6">
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Enable Webhook Integration</h4>
+              <p className="text-sm text-gray-500">Allow sending incident data to external webhooks</p>
+            </div>
+            <button
+              onClick={() => handleWebhookConfigChange('enabled', !webhookConfig.enabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                webhookConfig.enabled ? 'bg-purple-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  webhookConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {webhookConfig.enabled && (
+            <>
+              {/* Webhook URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Webhook URL
+                </label>
+                <input
+                  type="url"
+                  value={webhookConfig.url}
+                  onChange={(e) => handleWebhookConfigChange('url', e.target.value)}
+                  placeholder="https://your-system.com/webhook"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* HTTP Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  HTTP Method
+                </label>
+                <select
+                  value={webhookConfig.method}
+                  onChange={(e) => handleWebhookConfigChange('method', e.target.value as 'POST' | 'PUT' | 'PATCH')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+              </div>
+
+              {/* Custom Headers */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Custom Headers (JSON)
+                </label>
+                <textarea
+                  value={JSON.stringify(webhookConfig.headers, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const headers = JSON.parse(e.target.value)
+                      handleWebhookConfigChange('headers', headers)
+                    } catch (error) {
+                      // Invalid JSON, don't update
+                    }
+                  }}
+                  placeholder='{"Authorization": "Bearer token", "X-Custom-Header": "value"}'
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
+                />
+              </div>
+
+              {/* Timeout and Retry Configuration */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Timeout (seconds)
+                  </label>
+                  <input
+                    type="number"
+                    value={webhookConfig.timeout}
+                    onChange={(e) => handleWebhookConfigChange('timeout', parseInt(e.target.value))}
+                    min="1"
+                    max="300"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Retry Count
+                  </label>
+                  <input
+                    type="number"
+                    value={webhookConfig.retry_count}
+                    onChange={(e) => handleWebhookConfigChange('retry_count', parseInt(e.target.value))}
+                    min="0"
+                    max="10"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* SSL Verification */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900">Verify SSL Certificate</h4>
+                  <p className="text-sm text-gray-500">Verify SSL certificates when making webhook requests</p>
+                </div>
+                <button
+                  onClick={() => handleWebhookConfigChange('verify_ssl', !webhookConfig.verify_ssl)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    webhookConfig.verify_ssl ? 'bg-purple-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      webhookConfig.verify_ssl ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
+import { Filter, ChevronLeft, ChevronRight, Eye, Plus, Save, ArrowLeft } from 'lucide-react'
 import { auditApi, type AuditEvent } from '@/lib/api'
 import { formatDate, getStatusColor } from '@/lib/utils'
 import { DynamicFilter, type DynamicFilterItem } from '@/components/DynamicFilter'
 
 export function AuditLogs() {
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<'logs' | 'create'>('logs')
+  
   const [filters, setFilters] = useState({
     page: 1,
     size: 20,
@@ -24,6 +27,53 @@ export function AuditLogs() {
     available_fields: string[]
     supported_operators: string[]
   }>({ available_fields: [], supported_operators: [] })
+
+  // Create Event form state
+  const [formData, setFormData] = useState({
+    event_type: '',
+    user_id: '',
+    session_id: '',
+    ip_address: '',
+    user_agent: '',
+    resource_type: '',
+    resource_id: '',
+    action: '',
+    status: 'success',
+    request_data: '',
+    response_data: '',
+    metadata: '',
+    tenant_id: 'default',
+    service_name: 'audit-service',
+    correlation_id: '',
+    retention_period_days: 90,
+  })
+
+  // Create Event mutation
+  const createEventMutation = useMutation({
+    mutationFn: auditApi.createEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] })
+      setActiveTab('logs')
+      setFormData({
+        event_type: '',
+        user_id: '',
+        session_id: '',
+        ip_address: '',
+        user_agent: '',
+        resource_type: '',
+        resource_id: '',
+        action: '',
+        status: 'success',
+        request_data: '',
+        response_data: '',
+        metadata: '',
+        tenant_id: 'default',
+        service_name: 'audit-service',
+        correlation_id: '',
+        retention_period_days: 90,
+      })
+    },
+  })
 
   // Fetch filter information
   const { data: filterInfoData } = useQuery({
@@ -70,6 +120,19 @@ export function AuditLogs() {
     setFilters(prev => ({ ...prev, page: 1 }))
   }
 
+  const handleCreateEvent = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    const eventData = {
+      ...formData,
+      request_data: formData.request_data ? JSON.parse(formData.request_data) : undefined,
+      response_data: formData.response_data ? JSON.parse(formData.response_data) : undefined,
+      metadata: formData.metadata ? JSON.parse(formData.metadata) : undefined,
+    }
+
+    createEventMutation.mutate(eventData)
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -94,6 +157,38 @@ export function AuditLogs() {
         <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
         <p className="text-gray-600">Browse and search through audit events</p>
       </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'logs'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Eye className="w-4 h-4 inline mr-2" />
+            View Logs
+          </button>
+          <button
+            onClick={() => setActiveTab('create')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'create'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Plus className="w-4 h-4 inline mr-2" />
+            Create Event
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'logs' && (
+        <>
 
       {/* Filters */}
       <div className="card">
@@ -288,6 +383,205 @@ export function AuditLogs() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* Create Event Tab */}
+      {activeTab === 'create' && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Create New Audit Event</h2>
+              <p className="text-sm text-gray-600">Manually create an audit event for testing or documentation purposes</p>
+            </div>
+            <button
+              onClick={() => setActiveTab('logs')}
+              className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Logs
+            </button>
+          </div>
+
+          <form onSubmit={handleCreateEvent} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-md font-medium text-gray-900">Basic Information</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Event Type *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.event_type}
+                    onChange={(e) => setFormData(prev => ({ ...prev, event_type: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    User ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.user_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Action *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.action}
+                    onChange={(e) => setFormData(prev => ({ ...prev, action: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="success">Success</option>
+                    <option value="failure">Failure</option>
+                    <option value="error">Error</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Resource Information */}
+              <div className="space-y-4">
+                <h3 className="text-md font-medium text-gray-900">Resource Information</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Resource Type
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.resource_type}
+                    onChange={(e) => setFormData(prev => ({ ...prev, resource_type: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Resource ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.resource_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, resource_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    IP Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.ip_address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ip_address: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Session ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.session_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, session_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Data */}
+            <div className="space-y-4">
+              <h3 className="text-md font-medium text-gray-900">Additional Data</h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Request Data (JSON)
+                </label>
+                <textarea
+                  value={formData.request_data}
+                  onChange={(e) => setFormData(prev => ({ ...prev, request_data: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  placeholder='{"key": "value"}'
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Response Data (JSON)
+                </label>
+                <textarea
+                  value={formData.response_data}
+                  onChange={(e) => setFormData(prev => ({ ...prev, response_data: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  placeholder='{"key": "value"}'
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Metadata (JSON)
+                </label>
+                <textarea
+                  value={formData.metadata}
+                  onChange={(e) => setFormData(prev => ({ ...prev, metadata: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  placeholder='{"key": "value"}'
+                />
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('logs')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createEventMutation.isPending}
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
