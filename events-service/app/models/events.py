@@ -72,6 +72,14 @@ class IncidentType(str, Enum):
     OTHER = "other"
 
 
+class OutageStatus(str, Enum):
+    """Outage status levels"""
+    ACTIVE = "active"
+    RESOLVED = "resolved"
+    INVESTIGATING = "investigating"
+    MONITORING = "monitoring"
+
+
 class AlertSeverity(str, Enum):
     """Alert severity levels"""
     CRITICAL = "critical"
@@ -1174,6 +1182,35 @@ class RSSFeedConfig(BaseModel):
     max_items: int = Field(default=50, description="Maximum number of items in feed")
     include_resolved: bool = Field(default=False, description="Whether to include resolved incidents")
     include_updates: bool = Field(default=True, description="Whether to include incident updates")
+
+
+# Outage Models
+class OutageResponse(BaseModel):
+    """Response model for outages"""
+    outage_id: str = Field(..., description="Unique outage identifier")
+    provider: str = Field(..., description="Cloud provider")
+    service: str = Field(..., description="Service name")
+    status: OutageStatus = Field(..., description="Outage status")
+    title: str = Field(..., description="Outage title")
+    description: str = Field(..., description="Outage description")
+    start_time: datetime = Field(..., description="When outage started")
+    end_time: Optional[datetime] = Field(None, description="When outage ended")
+    affected_regions: List[str] = Field(default=[], description="Affected regions")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        from_attributes = True
+
+
+class OutageListResponse(BaseModel):
+    """Response model for outage lists"""
+    outages: List[OutageResponse]
+    total: int = Field(..., description="Total number of outages")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of outages per page")
+    has_next: bool = Field(..., description="Whether there are more pages")
+    has_prev: bool = Field(..., description="Whether there are previous pages")
 
 
 # Update forward references

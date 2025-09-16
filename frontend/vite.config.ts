@@ -54,27 +54,27 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/v1/outages': {
-        target: 'http://events:8003',
+        target: 'http://audit-events:8003',
         changeOrigin: true,
       },
       '/api/v1/incidents': {
-        target: 'http://events:8003',
+        target: 'http://audit-events:8003',
         changeOrigin: true,
       },
       '/api/v1/processors': {
-        target: 'http://events:8003',
+        target: 'http://audit-events:8003',
         changeOrigin: true,
       },
       '/api/v1/subscriptions': {
-        target: 'http://events:8003',
+        target: 'http://audit-events:8003',
         changeOrigin: true,
       },
       '/api/v1/events': {
-        target: 'http://events:8003',
+        target: 'http://audit-events:8003',
         changeOrigin: true,
       },
       '/api/v1/pubsub': {
-        target: 'http://events:8003',
+        target: 'http://audit-events:8003',
         changeOrigin: true,
       },
       '/api/v1/webhook': {
