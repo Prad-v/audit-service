@@ -9,26 +9,32 @@ interface NodePropertiesProps {
 export function NodeProperties({ node, onUpdate }: NodePropertiesProps) {
   const [config, setConfig] = useState(node.config || {})
   const [name, setName] = useState(node.name || '')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   useEffect(() => {
     setConfig(node.config || {})
     setName(node.name || '')
+    setHasUnsavedChanges(false)
   }, [node])
 
   const handleConfigChange = (key: string, value: any) => {
     const newConfig = { ...config, [key]: value }
     setConfig(newConfig)
+    setHasUnsavedChanges(true)
   }
 
   const handleNameChange = (newName: string) => {
     setName(newName)
+    setHasUnsavedChanges(true)
   }
 
   const handleApplyChanges = () => {
+    console.log('Applying changes:', { name, config })
     onUpdate({ 
       name: name,
       config: config 
     })
+    setHasUnsavedChanges(false)
   }
 
   const renderNodeSpecificConfig = () => {
@@ -494,7 +500,7 @@ export function NodeProperties({ node, onUpdate }: NodePropertiesProps) {
             </label>
             <input
               type="text"
-              value={node.name}
+              value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter node name"
@@ -522,13 +528,15 @@ export function NodeProperties({ node, onUpdate }: NodePropertiesProps) {
       <div className="pt-4 border-t border-gray-200">
         <div className="flex space-x-2">
           <button
-            onClick={() => {
-              const newConfig = { ...config }
-              onUpdate({ config: newConfig })
-            }}
-            className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 text-sm font-medium"
+            onClick={handleApplyChanges}
+            disabled={!hasUnsavedChanges}
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              hasUnsavedChanges
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            Apply Changes
+            {hasUnsavedChanges ? 'Apply Changes' : 'No Changes'}
           </button>
         </div>
       </div>

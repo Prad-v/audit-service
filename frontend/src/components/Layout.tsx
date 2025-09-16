@@ -63,7 +63,7 @@ export function Layout({ children }: LayoutProps) {
 
   const otherNavigation = [
     { name: 'Cloud Provider Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
-    { name: 'Synthetic Tests', href: '/synthetic-tests', icon: TestTube },
+      { name: 'StackStorm Tests', href: '/synthetic-tests', icon: TestTube },
     { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
   ]
 

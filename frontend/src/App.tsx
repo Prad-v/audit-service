@@ -10,7 +10,7 @@ import { EventFramework } from './pages/EventFramework'
 import EventPipelineBuilder from './pages/EventPipelineBuilder'
 import { OutageMonitoring } from './pages/OutageMonitoring'
 import ProductStatus from './pages/ProductStatus'
-import SyntheticTests from './pages/SyntheticTests'
+import StackStormTests from './pages/StackStormTests'
 import { FeatureFlagsProvider, useFeatureFlags } from './contexts/FeatureFlagsContext'
 import { AppSettingsProvider } from './contexts/AppSettingsContext'
 
@@ -33,7 +33,7 @@ function AppRoutes() {
       )}
       <Route path="/outage-monitoring" element={<OutageMonitoring />} />
       <Route path="/product-status" element={<ProductStatus />} />
-      <Route path="/synthetic-tests" element={<SyntheticTests />} />
+          <Route path="/synthetic-tests" element={<StackStormTests />} />
     </Routes>
   );
 }

@@ -123,7 +123,7 @@ export function TestExecutionHistory({ executions, loading }: TestExecutionHisto
                         </div>
                         <div>
                           <span className="font-medium">Nodes:</span>
-                          <span className="ml-1">{Object.keys(execution.node_results).length}</span>
+                          <span className="ml-1">{execution.node_results ? Object.keys(execution.node_results).length : 0}</span>
                         </div>
                       </div>
 
@@ -154,7 +154,7 @@ export function TestExecutionHistory({ executions, loading }: TestExecutionHisto
                       )}
 
                       {/* Node Results Summary */}
-                      {Object.keys(execution.node_results).length > 0 && (
+                      {execution.node_results && Object.keys(execution.node_results).length > 0 && (
                         <div className="mt-3">
                           <div className="text-sm font-medium text-gray-700 mb-2">Node Results:</div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">

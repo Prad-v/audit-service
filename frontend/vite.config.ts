@@ -85,10 +85,11 @@ export default defineConfig({
         target: 'http://audit-service:8000',
         changeOrigin: true,
       },
-      '/api/v1/synthetic-tests': {
-        target: 'http://synthetic-tests:8002',
-        changeOrigin: true,
-      },
+    '/api/v1/stackstorm-tests': {
+      target: 'http://stackstorm-tests:8002',
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api\/v1\/stackstorm-tests/, '/api/v1'),
+    },
     },
   },
   build: {

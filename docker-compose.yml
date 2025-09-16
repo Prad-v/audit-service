@@ -171,26 +171,28 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      synthetic-tests:
+      stackstorm-tests:
         condition: service_healthy
     networks:
       - audit-network
     restart: unless-stopped
 
-  # Synthetic Test Framework
-  synthetic-tests:
+  # StackStorm Synthetic Test Framework
+  stackstorm-tests:
     build:
-      context: ./backend/services/synthetic-tests
+      context: ./backend/services/stackstorm-tests
       dockerfile: Dockerfile
-    container_name: audit-synthetic-tests
+    container_name: audit-stackstorm-tests
     ports:
       - "8004:8002"
     environment:
       - DATABASE_URL=postgresql://audit_user:audit_password@postgres:5432/audit_logs
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
-      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-}
+      - STACKSTORM_API_URL=http://stackstorm:9101
+      - STACKSTORM_AUTH_URL=http://stackstorm:9100
+      - STACKSTORM_USERNAME=${STACKSTORM_USERNAME:-st2admin}
+      - STACKSTORM_PASSWORD=${STACKSTORM_PASSWORD:-st2admin}
+      - STACKSTORM_API_KEY=${STACKSTORM_API_KEY:-}
       - INCIDENT_API_URL=http://api:8000/api/v1/incidents
-      - WEBHOOK_BASE_URL=http://localhost:8004/webhooks
       - REDIS_URL=redis://redis:6379
       - LOG_LEVEL=INFO
     depends_on:
@@ -209,6 +211,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # StackStorm (for testing - in production, use external StackStorm)
+  stackstorm:
+    image: stackstorm/stackstorm:3.9.0
+    container_name: audit-stackstorm
+    ports:
+      - "9100:9100"  # Auth API
+      - "9101:9101"  # API
+      - "9102:9102"  # Web UI
+    environment:
+      - ST2_USER=st2admin
+      - ST2_PASSWORD=st2admin
+      - ST2_AUTH_USERNAME=st2admin
+      - ST2_AUTH_PASSWORD=st2admin
+    volumes:
+      - stackstorm_data:/var/lib/st2
+    networks:
+      - audit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9101/v1/actions"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # Alerting Service
   alerting:
@@ -464,6 +491,8 @@ volumes:
   redis_data:
     driver: local
   nats_data:
+    driver: local
+  stackstorm_data:
     driver: local
   prometheus_data:
     driver: local

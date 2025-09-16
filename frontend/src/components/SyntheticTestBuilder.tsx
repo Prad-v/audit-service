@@ -64,6 +64,7 @@ export function SyntheticTestBuilder({ test, onSave, onTestSelect }: SyntheticTe
   }, [])
 
   const handleNodeUpdate = useCallback((nodeId: string, updates: any) => {
+    console.log('Updating node:', nodeId, updates)
     setCurrentTest(prev => ({
       ...prev,
       nodes: prev.nodes.map(node => 

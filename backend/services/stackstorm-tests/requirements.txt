@@ -1,0 +1,35 @@
+# StackStorm Synthetic Test Framework Requirements
+
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.13.0
+
+# HTTP client
+aiohttp==3.9.1
+
+# NATS messaging
+nats-py==2.3.0
+
+# Redis for caching
+redis==5.0.1
+aioredis==2.0.1
+
+# Background tasks
+celery==5.3.4
+
+# JSON schema validation
+jsonschema==4.20.0
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Logging and monitoring
+structlog==23.2.0
