@@ -171,9 +171,44 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      synthetic-tests:
+        condition: service_healthy
     networks:
       - audit-network
     restart: unless-stopped
+
+  # Synthetic Test Framework
+  synthetic-tests:
+    build:
+      context: ./backend/services/synthetic-tests
+      dockerfile: Dockerfile
+    container_name: audit-synthetic-tests
+    ports:
+      - "8004:8002"
+    environment:
+      - DATABASE_URL=postgresql://audit_user:audit_password@postgres:5432/audit_logs
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-}
+      - INCIDENT_API_URL=http://api:8000/api/v1/incidents
+      - WEBHOOK_BASE_URL=http://localhost:8004/webhooks
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - audit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Alerting Service
   alerting:

@@ -85,6 +85,10 @@ export default defineConfig({
         target: 'http://audit-service:8000',
         changeOrigin: true,
       },
+      '/api/v1/synthetic-tests': {
+        target: 'http://synthetic-tests:8002',
+        changeOrigin: true,
+      },
     },
   },
   build: {

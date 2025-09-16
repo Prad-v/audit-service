@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, FileText, Home, BookOpen, Heart, Settings, AlertTriangle, Database, WifiOff } from 'lucide-react'
+import { Activity, FileText, Home, BookOpen, Heart, Settings, AlertTriangle, Database, WifiOff, TestTube } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { auditApi } from '@/lib/api'
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext'
@@ -63,6 +63,7 @@ export function Layout({ children }: LayoutProps) {
 
   const otherNavigation = [
     { name: 'Cloud Provider Outage Monitoring', href: '/outage-monitoring', icon: WifiOff },
+    { name: 'Synthetic Tests', href: '/synthetic-tests', icon: TestTube },
     { name: 'Alert Management', href: '/alert-management', icon: AlertTriangle },
   ]
 

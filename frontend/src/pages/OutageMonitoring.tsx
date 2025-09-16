@@ -693,43 +693,45 @@ export function OutageMonitoring() {
 
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Cloud Provider Outage Monitoring</h1>
-          <p className="text-gray-600 mt-2">
-            Monitor cloud provider outages and status pages
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={checkAllProviders}
-            disabled={checking}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
-            {checking ? 'Checking...' : 'Check All'}
-          </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Compact Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Cloud Provider Outage Monitoring</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Monitor cloud provider outages and status pages
+            </p>
+          </div>
+          <div className="flex space-x-3">
+            <button
+              onClick={checkAllProviders}
+              disabled={checking}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+              {checking ? 'Checking...' : 'Check All'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
           <div className="flex">
-            <AlertTriangle className="w-5 h-5 text-red-400 mr-2" />
-            <span className="text-red-800">{error}</span>
+            <AlertTriangle className="w-4 h-4 text-red-400 mr-2 mt-0.5" />
+            <span className="text-red-800 text-sm">{error}</span>
           </div>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      {/* Compact Tabs */}
+      <div className="bg-white border-b border-gray-200 px-6">
+        <nav className="flex space-x-6">
           <button
             onClick={() => setActiveTab('active')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'active'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -742,7 +744,7 @@ export function OutageMonitoring() {
           </button>
           <button
             onClick={() => setActiveTab('historical')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-3 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'historical'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -757,34 +759,36 @@ export function OutageMonitoring() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'active' ? (
-        <ActiveOutagesTab 
-          status={status}
-          loading={loading}
-          onRefresh={loadStatus}
-          formatDateTime={formatDateTime}
-          activeOutagesCount={activeOutagesCount}
-          onActiveCountChange={setActiveOutagesCount}
-        />
-      ) : (
-        <HistoricalOutagesTab 
-          outageHistory={outageHistory}
-          historyStats={historyStats}
-          loadingHistory={loadingHistory}
-          selectedProvider={selectedProvider}
-          selectedDays={selectedDays}
-          dataSource={dataSource}
-          onProviderFilter={handleProviderFilter}
-          onDaysFilter={handleDaysFilter}
-          onDataSourceChange={setDataSource}
-          onRefresh={loadOutageHistory}
-          onViewDetails={handleViewDetails}
-          getSeverityColor={getSeverityColor}
-          getStatusColor={getStatusColor}
-          formatDate={formatDate}
-          formatDateTime={formatDateTime}
-        />
-      )}
+      <div className="px-6 py-6">
+        {activeTab === 'active' ? (
+          <ActiveOutagesTab 
+            status={status}
+            loading={loading}
+            onRefresh={loadStatus}
+            formatDateTime={formatDateTime}
+            activeOutagesCount={activeOutagesCount}
+            onActiveCountChange={setActiveOutagesCount}
+          />
+        ) : (
+          <HistoricalOutagesTab 
+            outageHistory={outageHistory}
+            historyStats={historyStats}
+            loadingHistory={loadingHistory}
+            selectedProvider={selectedProvider}
+            selectedDays={selectedDays}
+            dataSource={dataSource}
+            onProviderFilter={handleProviderFilter}
+            onDaysFilter={handleDaysFilter}
+            onDataSourceChange={setDataSource}
+            onRefresh={loadOutageHistory}
+            onViewDetails={handleViewDetails}
+            getSeverityColor={getSeverityColor}
+            getStatusColor={getStatusColor}
+            formatDate={formatDate}
+            formatDateTime={formatDateTime}
+          />
+        )}
+      </div>
 
       {/* Progress Slider */}
       <OutageProgressSlider
@@ -821,92 +825,92 @@ interface ActiveOutagesTabProps {
 
 function ActiveOutagesTab({ status, loading, onRefresh, formatDateTime, activeOutagesCount, onActiveCountChange }: ActiveOutagesTabProps) {
   return (
-    <div className="space-y-6">
-      {/* Service Status */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Service Status</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={onRefresh}
-              disabled={loading}
-              className="bg-gray-600 text-white px-3 py-1 rounded-md hover:bg-gray-700 disabled:opacity-50 flex items-center text-sm"
-            >
-              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+    <div className="space-y-4">
+      {/* Compact Service Status */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <h2 className="text-lg font-semibold text-gray-900">Service Status</h2>
+            <span className="text-sm text-gray-600">Running (5min intervals)</span>
           </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50 flex items-center text-sm"
+          >
+            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading status...</p>
+          <div className="text-center py-6">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600 text-sm">Loading status...</p>
           </div>
         ) : status ? (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-lg font-medium">
-                Status: Running (Scheduled every 5 minutes)
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-900">Check Interval</h3>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
                 <p className="text-2xl font-bold text-blue-600">
-                  {Math.round(status.check_interval_seconds / 60)} min
+                  {Math.round(status.check_interval_seconds / 60)}m
                 </p>
+                <p className="text-xs text-gray-600">Interval</p>
               </div>
               
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-900">Monitored Providers</h3>
+              <div className="text-center">
                 <p className="text-2xl font-bold text-green-600">
                   {status.monitored_providers.length}
                 </p>
+                <p className="text-xs text-gray-600">Providers</p>
               </div>
               
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-900">Active Outages</h3>
+              <div className="text-center">
                 <p className="text-2xl font-bold text-orange-600">
                   {activeOutagesCount}
                 </p>
+                <p className="text-xs text-gray-600">Active</p>
               </div>
               
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-900">Last Scanned</h3>
+              <div className="text-center">
                 <p className="text-sm font-medium text-purple-600">
                   {status.last_check_time ? formatDateTime(status.last_check_time) : 'Never'}
                 </p>
+                <p className="text-xs text-gray-600">Last Scan</p>
               </div>
             </div>
 
-            {/* Provider Status */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-3">Provider Status</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Compact Provider Status */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h3 className="font-medium text-gray-900 mb-3 text-sm">Provider Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {status.monitored_providers.map((provider) => (
-                  <div key={provider.provider} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900 capitalize">
+                  <div key={provider.provider} className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-gray-900 capitalize text-sm">
                         {provider.provider}
                       </h4>
-                      <span className="text-sm text-gray-500">
-                        {provider.known_outages_count} outages
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          provider.known_outages_count > 0 ? 'bg-red-500' : 'bg-green-500'
+                        }`}></div>
+                        <span className="text-xs text-gray-600">
+                          {provider.known_outages_count}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      Last check: {provider.last_check ? formatDateTime(provider.last_check) : 'Never'}
-                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {provider.last_check ? formatDateTime(provider.last_check) : 'Never'}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          </>
         ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-600">No status information available</p>
+          <div className="text-center py-6">
+            <p className="text-gray-600 text-sm">No status information available</p>
           </div>
         )}
       </div>
@@ -1199,14 +1203,14 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
   }
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-gray-900">Active Incidents</h2>
         <div className="flex items-center space-x-2">
           <button
             onClick={() => handleCreateIncidentFromOutage()}
             disabled={loading || activeOutages.length === 0 || activeOutages.every(outage => outage.incident_id)}
-            className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm"
+            className="bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm"
             title={
               activeOutages.length === 0 
                 ? "No active outages to create incident from" 
@@ -1221,7 +1225,7 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
           <button
             onClick={loadActiveOutages}
             disabled={loading}
-            className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center text-sm"
+            className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 disabled:opacity-50 flex items-center text-sm"
           >
             <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -1230,18 +1234,17 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
       </div>
 
       {activeOutages.length === 0 ? (
-        <div className="text-center py-8">
+        <div className="text-center py-6">
           <div className="text-green-600 mb-2">
-            <CheckCircle className="w-12 h-12 mx-auto" />
+            <CheckCircle className="w-8 h-8 mx-auto" />
           </div>
-          <p className="text-gray-600">No active incidents detected</p>
-          <p className="text-sm text-gray-500 mt-1">All cloud services are operating normally</p>
-          <p className="text-xs text-gray-400 mt-2">Note: A demo event will be shown for testing purposes</p>
+          <p className="text-gray-600 text-sm">No active incidents detected</p>
+          <p className="text-xs text-gray-500 mt-1">All cloud services are operating normally</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {activeOutages.map((outage) => (
-            <div key={outage.event_id} className="border rounded-lg p-4 bg-red-50 border-red-200">
+            <div key={outage.event_id} className="border rounded-lg p-3 bg-red-50 border-red-200">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
@@ -1258,25 +1261,25 @@ function ActiveIncidentsSection({ onActiveCountChange }: { onActiveCountChange?:
                     )}
                   </div>
                   
-                  <h3 className="font-medium text-gray-900 mb-1">{outage.title}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{outage.description}</p>
+                  <h3 className="font-medium text-gray-900 mb-1 text-sm">{outage.title}</h3>
+                  <p className="text-xs text-gray-600 mb-2 line-clamp-2">{outage.description}</p>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                     <div>
                       <span className="text-gray-500">Provider:</span>
-                      <span className="ml-2 font-medium capitalize">{outage.provider}</span>
+                      <span className="ml-1 font-medium capitalize">{outage.provider}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Service:</span>
-                      <span className="ml-2 font-medium">{outage.service}</span>
+                      <span className="ml-1 font-medium">{outage.service}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Region:</span>
-                      <span className="ml-2 font-medium">{outage.region || 'N/A'}</span>
+                      <span className="ml-1 font-medium">{outage.region || 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Started:</span>
-                      <span className="ml-2 font-medium">{formatDateTime(outage.event_time)}</span>
+                      <span className="ml-1 font-medium">{formatDateTime(outage.event_time)}</span>
                     </div>
                   </div>
                   
@@ -1355,268 +1358,223 @@ function HistoricalOutagesTab({
 }: HistoricalOutagesTabProps) {
   return (
     <div className="space-y-6">
-      {/* Historical Statistics */}
-      {historyStats && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+      {/* Header Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-6">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-3">
               <BarChart3 className="w-5 h-5" />
-              Historical Statistics (Last {selectedDays} days)
+              Historical Outages
             </h2>
-            <div className="flex items-center space-x-4">
-              {/* Data Source Toggle */}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">Data Source:</span>
-                <div className="flex bg-gray-100 rounded-md p-1">
-                  <button
-                    onClick={() => onDataSourceChange('database')}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      dataSource === 'database'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Database
-                  </button>
-                  <button
-                    onClick={() => onDataSourceChange('providers')}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      dataSource === 'providers'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Cloud APIs
-                  </button>
+            {historyStats && (
+              <div className="flex items-center space-x-6 text-sm">
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-600">Total:</span>
+                  <span className="font-bold text-blue-600 text-lg">{historyStats.total_count}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-600">Period:</span>
+                  <span className="font-medium">{selectedDays} days</span>
                 </div>
               </div>
-
-              {/* Time Range Dropdown */}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">Time Range:</span>
-                <select
-                  value={selectedDays}
-                  onChange={(e) => onDaysFilter(Number(e.target.value))}
-                  className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={30}>Last 30 days</option>
-                  <option value={90}>Last 3 months</option>
-                  <option value={180}>Last 6 months</option>
-                  <option value={365}>Last 1 year</option>
-                </select>
-              </div>
-            </div>
+            )}
           </div>
-
-          {/* Statistics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium text-gray-900">Total Outages</h3>
-              <p className="text-2xl font-bold text-blue-600">
-                {historyStats.total_count}
-              </p>
-            </div>
-            
-            {historyStats.statistics && Object.entries(historyStats.statistics).map(([provider, stats]) => (
-              <div key={provider} className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-900 capitalize">{provider}</h3>
-                <p className="text-2xl font-bold text-green-600">
-                  {stats.count}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {stats.first_outage && formatDate(stats.first_outage)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            Filters
-          </h2>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => onProviderFilter('')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              selectedProvider === ''
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All Providers
-          </button>
-          <button
-            onClick={() => onProviderFilter('gcp')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              selectedProvider === 'gcp'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            GCP
-          </button>
-          <button
-            onClick={() => onProviderFilter('aws')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              selectedProvider === 'aws'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            AWS
-          </button>
-          <button
-            onClick={() => onProviderFilter('azure')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              selectedProvider === 'azure'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Azure
-          </button>
-          <button
-            onClick={() => onProviderFilter('oci')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-              selectedProvider === 'oci'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            OCI
-          </button>
-        </div>
-      </div>
-
-      {/* Outage History */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Outage History (total: {outageHistory.length})
-          </h2>
           <button
             onClick={onRefresh}
             disabled={loadingHistory}
-            className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center text-sm font-medium"
           >
-            <RefreshCw className={`w-4 h-4 ${loadingHistory ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${loadingHistory ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
 
+        {/* Controls Section */}
+        <div className="space-y-4">
+          {/* Provider Filters */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Provider</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => onProviderFilter('')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  selectedProvider === ''
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Providers
+              </button>
+              <button
+                onClick={() => onProviderFilter('gcp')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  selectedProvider === 'gcp'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                GCP
+              </button>
+              <button
+                onClick={() => onProviderFilter('aws')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  selectedProvider === 'aws'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                AWS
+              </button>
+              <button
+                onClick={() => onProviderFilter('azure')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  selectedProvider === 'azure'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Azure
+              </button>
+              <button
+                onClick={() => onProviderFilter('oci')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  selectedProvider === 'oci'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                OCI
+              </button>
+            </div>
+          </div>
+
+          {/* Data Source and Time Range */}
+          <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-3">
+              <label className="text-sm font-medium text-gray-700">Data Source:</label>
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => onDataSourceChange('database')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    dataSource === 'database'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Database
+                </button>
+                <button
+                  onClick={() => onDataSourceChange('providers')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    dataSource === 'providers'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Cloud APIs
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <label className="text-sm font-medium text-gray-700">Time Range:</label>
+              <select
+                value={selectedDays}
+                onChange={(e) => onDaysFilter(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 3 months</option>
+                <option value={180}>Last 6 months</option>
+                <option value={365}>Last 1 year</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Outage History */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Outage History</h3>
+          <span className="text-sm text-gray-600">Showing {outageHistory.length} outages</span>
+        </div>
+
         {loadingHistory ? (
-          <div className="text-center py-8">
+          <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading outage history...</p>
+            <p className="mt-3 text-gray-600">Loading outage history...</p>
           </div>
         ) : outageHistory.length === 0 ? (
-          <div className="text-center py-8 text-gray-600">
+          <div className="text-center py-12 text-gray-600">
             <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-            <p>No outages detected</p>
+            <p className="text-lg">No outages detected</p>
+            <p className="text-sm mt-1">All cloud services are operating normally</p>
           </div>
         ) : (
           <div className="space-y-4">
             {outageHistory.map((outage) => (
-              <div key={outage.event_id} className="border rounded-lg p-6 hover:bg-gray-50">
+              <div key={outage.event_id} className="border border-gray-200 rounded-lg p-5 hover:bg-gray-50 transition-colors">
                 <div className="space-y-4">
-                  {/* Header with severity and status badges */}
-                  <div className="flex items-center space-x-2 mb-4">
-                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${getSeverityColor(outage.severity)}`}>
-                      {outage.severity}
-                    </span>
-                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(outage.resolved_at ? 'resolved' : outage.status)}`}>
-                      {outage.resolved_at ? 'resolved' : outage.status}
-                    </span>
+                  {/* Header with badges and action */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className={`px-3 py-1 text-sm font-medium rounded-full ${getSeverityColor(outage.severity)}`}>
+                        {outage.severity}
+                      </span>
+                      <span className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(outage.resolved_at ? 'resolved' : outage.status)}`}>
+                        {outage.resolved_at ? 'resolved' : outage.status}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => onViewDetails(outage)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium px-3 py-1 rounded-md hover:bg-blue-50 transition-colors"
+                    >
+                      View Details
+                    </button>
                   </div>
 
-                  {/* Incident Details Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-2">
-                      <div className="flex">
-                        <span className="text-gray-500 font-medium w-24">Description:</span>
-                        <span className="text-gray-900">{outage.title}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="text-gray-500 font-medium w-24">ID:</span>
-                        <a 
-                          href={`https://status.cloud.google.com/incidents/${outage.event_id.replace(/^historical-gcp-/, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 underline font-mono text-xs"
-                        >
-                          {outage.event_id.replace(/^historical-gcp-/, '')}
-                        </a>
-                      </div>
-                      <div className="flex">
-                        <span className="text-gray-500 font-medium w-24">Status:</span>
-                        <span className="text-gray-900 capitalize">
-                          {outage.resolved_at ? 'resolved' : outage.status}
-                        </span>
-                      </div>
+                  {/* Title */}
+                  <h3 className="font-semibold text-gray-900 text-base leading-relaxed">{outage.title}</h3>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 font-medium">Provider:</span>
+                      <p className="text-gray-900 capitalize font-medium">{outage.provider}</p>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex">
-                        <span className="text-gray-500 font-medium w-24">Begin Time:</span>
-                        <span className="text-gray-900">{formatDateTime(outage.event_time)}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="text-gray-500 font-medium w-24">End Time:</span>
-                        <span className="text-gray-900">
-                          {outage.resolved_at ? formatDateTime(outage.resolved_at) : 'Ongoing'}
-                        </span>
-                      </div>
+                    <div>
+                      <span className="text-gray-500 font-medium">Service:</span>
+                      <p className="text-gray-900 font-medium">{outage.service}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 font-medium">Started:</span>
+                      <p className="text-gray-900 font-medium">{formatDateTime(outage.event_time)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 font-medium">Duration:</span>
+                      <p className="text-gray-900 font-medium">
+                        {outage.resolved_at ? 
+                          `${Math.round((new Date(outage.resolved_at).getTime() - new Date(outage.event_time).getTime()) / (1000 * 60))} minutes` : 
+                          'Ongoing'
+                        }
+                      </p>
                     </div>
                   </div>
 
-                  {/* Service and Region Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex">
-                      <span className="text-gray-500 font-medium w-24">Service:</span>
-                      <span className="text-gray-900">{outage.service}</span>
-                    </div>
-                    <div className="flex">
-                      <span className="text-gray-500 font-medium w-24">Region:</span>
-                      <span className="text-gray-900">{outage.region || 'N/A'}</span>
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <IncidentSummary outage={outage} onViewDetails={onViewDetails} />
-                  
-
-
-                  {/* Affected Services */}
-                  {outage.affected_services.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-gray-500 font-medium">Affected Services:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {outage.affected_services.map((service, index) => (
-                          <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                            {service}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Affected Regions */}
-                  {outage.affected_regions.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-gray-500 font-medium">Affected Regions:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {outage.affected_regions.map((region, index) => (
-                          <span key={index} className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
-                            {region}
-                          </span>
-                        ))}
+                  {/* Regions (if available) */}
+                  {outage.affected_regions && outage.affected_regions.length > 0 && (
+                    <div>
+                      <span className="text-gray-500 font-medium text-sm">Affected Regions:</span>
+                      <div className="mt-1">
+                        {outage.affected_regions.length > 10 ? (
+                          <div>
+                            <p className="text-gray-900 text-sm">
+                              {outage.affected_regions.slice(0, 10).join(', ')} and {outage.affected_regions.length - 10} more
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-900 text-sm">{outage.affected_regions.join(', ')}</p>
+                        )}
                       </div>
                     </div>
                   )}
