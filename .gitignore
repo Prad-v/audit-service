@@ -202,11 +202,11 @@ typings/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist - Commented out to include built frontend files
 
 # Gatsby files
 .cache/
-public
+# public - Commented out to include public assets
 
 # Storybook build outputs
 .out
@@ -251,11 +251,9 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
-*.sql
 
-# Generated files
-openapi.json
-openapi.yaml
+
+
 
 # Local development
 .env.local
@@ -297,3 +295,22 @@ docs/_build/
 # Temporary files
 .tmp/
 .temp/
+
+# Include important files that should not be ignored
+!frontend/dist/
+!frontend/public/
+!*.sql
+!scripts/
+!helm/
+!docs/
+!tests/
+!backend/services/*/requirements.txt
+!backend/services/*/Dockerfile
+!backend/services/*/app/
+!frontend/src/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/vite.config.ts
+!frontend/tailwind.config.js
+!frontend/tsconfig.json
+!frontend/index.html

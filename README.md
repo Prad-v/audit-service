@@ -7,8 +7,75 @@ A comprehensive audit logging system built with FastAPI backend and React fronte
 ### Prerequisites
 
 - Docker and Docker Compose
+- Make (for using Makefile commands)
 - Node.js 18+ (for local development)
 - Python 3.11+ (for local development)
+
+### New Machine Setup (Recommended)
+
+For setting up on a completely new machine, use the automated setup:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd audit-service
+
+# Run the complete setup (includes database creation, schema setup, and service startup)
+make setup
+
+# Start all services
+make start
+```
+
+Or use the one-command quick start:
+
+```bash
+./quick-start.sh
+```
+
+The application will be available at http://localhost:3000
+
+### Available Make Commands
+
+The project includes a comprehensive Makefile with the following commands:
+
+```bash
+# Setup commands
+make setup              # Complete setup for new machine
+make setup-env          # Create environment files
+make setup-db           # Setup database schemas
+make setup-frontend     # Install frontend dependencies
+make setup-backend      # Install backend dependencies
+
+# Docker commands
+make build              # Build all Docker images
+make start              # Start all services
+make stop               # Stop all services
+make restart            # Restart all services
+make clean              # Clean up Docker resources
+
+# Development commands
+make dev                # Start in development mode
+make logs               # Show all service logs
+make health             # Check service health
+
+# Testing commands
+make test               # Run all tests
+make test-backend       # Run backend tests
+make test-frontend      # Run frontend tests
+
+# Database commands
+make migrate-db         # Run database migrations
+make backup             # Backup database
+make restore            # Restore database from backup
+
+# Help
+make help               # Show all available commands
+```
+
+### Manual Setup
+
+If you prefer manual setup or need to troubleshoot:
 
 ### Using Docker (Recommended)
 
